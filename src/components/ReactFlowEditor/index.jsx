@@ -17,6 +17,8 @@ import TextCombinerNodeComponent from './nodes/TextCombinerNodeComponent';
 import VariableSetNodeComponent from './nodes/VariableSetNodeComponent';
 import ScheduleNodeComponent from './nodes/ScheduleNodeComponent';
 import TimestampNodeComponent from './nodes/TimestampNodeComponent';
+import HTTPRequestNodeComponent from './nodes/HTTPRequestNodeComponent';
+import WebSearchNodeComponent from './nodes/WebSearchNodeComponent';
 import CustomNode from './nodes/CustomNode';
 import CustomEdge from './edges/CustomEdge';
 import ContextMenu from './ContextMenu';
@@ -59,6 +61,8 @@ const nodeTypes = {
   text_combiner: TextCombinerNodeComponent,
   variable_set: VariableSetNodeComponent,
   schedule: ScheduleNodeComponent,
+  http_request: HTTPRequestNodeComponent,
+  web_search: WebSearchNodeComponent,
   // 他の未実装ノードタイプはCustomNodeで処理
 };
 
