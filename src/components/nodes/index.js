@@ -15,6 +15,7 @@ import ScheduleNode from './ScheduleNode.js';
 import TimestampNode from './TimestampNode.js';
 import HTTPRequestNode from './HTTPRequestNode.js';
 import WebSearchNode from './WebSearchNode.js';
+import CodeExecutionNode from './CodeExecutionNode.js';
 
 /**
  * 全てのノードタイプの定義を統合
@@ -31,7 +32,8 @@ export const nodeTypes = {
   schedule: ScheduleNode,
   timestamp: TimestampNode,
   http_request: HTTPRequestNode,
-  web_search: WebSearchNode
+  web_search: WebSearchNode,
+  code_execution: CodeExecutionNode
 };
 
 /**
@@ -56,7 +58,8 @@ export const nodesByCategory = {
   'text-processing': {
     name: 'Text Processing', 
     nodes: {
-      text_combiner: TextCombinerNode
+      text_combiner: TextCombinerNode,
+      code_execution: CodeExecutionNode
     }
   },
   'control-flow': {
