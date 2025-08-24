@@ -1,5 +1,7 @@
 # Build output
 dist/
+dist-offline/
+*.tar.gz
 
 # Dependencies
 node_modules/

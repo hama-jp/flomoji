@@ -177,39 +177,43 @@ const Layout = ({ children, currentView, onViewChange, editingNode, onEditingNod
   return (
     <div className="h-screen flex bg-gray-100" style={{ padding: '5px' }}>
       <div className="flex flex-1 bg-gray-50 rounded-lg overflow-hidden shadow-sm">
-        <div className={`${sidebarOpen ? 'w-64' : 'w-0'} transition-all duration-300 bg-white shadow-lg flex flex-col rounded-l-lg`}>
-        <div className="p-4 border-b">
-          <div className="flex items-center justify-between">
-            <h1 className="text-xl font-bold text-gray-800">🌊 flomoji</h1>
-            <Button variant="ghost" size="sm" onClick={() => setSidebarOpen(false)} className="md:hidden"><X className="h-4 w-4" /></Button>
-          </div>
-        </div>
-        
-        <nav className="flex-shrink-0 p-3">
-          <ul className="space-y-1">
-            {menuItems.map((item) => (
-              <li key={item.id}>
-                <Button variant={currentView === item.id ? 'default' : 'ghost'} size="sm" className="w-full justify-start h-8" onClick={() => onViewChange(item.id)}>
-                  <item.icon className="h-4 w-4 mr-2" />
-                  {item.label}
-                </Button>
-              </li>
-            ))}
-          </ul>
-        </nav>
-
-        {currentView === 'workflow' && (
-          <div className="flex-1 flex flex-col overflow-hidden border-t">
-            {editingNode ? (
-              <div className="flex-1 overflow-y-auto">
-                <NodePropertiesPanel editingNode={editingNode} onEditingNodeChange={onEditingNodeChange} />
+        <div className={`${sidebarOpen ? 'w-64' : 'w-0'} transition-all duration-300 bg-white shadow-lg flex flex-col rounded-l-lg overflow-hidden`}>
+        {sidebarOpen && (
+          <>
+            <div className="p-4 border-b">
+              <div className="flex items-center justify-between">
+                <h1 className="text-xl font-bold text-gray-800">🌊 flomoji</h1>
+                <Button variant="ghost" size="sm" onClick={() => setSidebarOpen(false)} className="md:hidden"><X className="h-4 w-4" /></Button>
               </div>
-            ) : (
-              <div className="flex-1 overflow-hidden">
-                <NodePaletteContextStyle />
+            </div>
+            
+            <nav className="flex-shrink-0 p-3">
+              <ul className="space-y-1">
+                {menuItems.map((item) => (
+                  <li key={item.id}>
+                    <Button variant={currentView === item.id ? 'default' : 'ghost'} size="sm" className="w-full justify-start h-8" onClick={() => onViewChange(item.id)}>
+                      <item.icon className="h-4 w-4 mr-2" />
+                      {item.label}
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            </nav>
+
+            {currentView === 'workflow' && (
+              <div className="flex-1 flex flex-col overflow-hidden border-t">
+                {editingNode ? (
+                  <div className="flex-1 overflow-y-auto">
+                    <NodePropertiesPanel editingNode={editingNode} onEditingNodeChange={onEditingNodeChange} />
+                  </div>
+                ) : (
+                  <div className="flex-1 overflow-hidden">
+                    <NodePaletteContextStyle />
+                  </div>
+                )}
               </div>
             )}
-          </div>
+          </>
         )}
       </div>
 
