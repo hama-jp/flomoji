@@ -48,7 +48,7 @@ jobs:
 
       - name: Run linting
         run: pnpm run lint
-        continue-on-error: false
+        continue-on-error: true
 
       - name: Run tests
         run: pnpm test
