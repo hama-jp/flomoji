@@ -13,6 +13,8 @@ flomojiは、複雑な環境構築なしにAIとの対話やワークフロー�
 - 🚀 **Browser-only**: No installation required, runs directly in your browser.
 - 💬 **AI Chat**: Real-time conversations with AI, with chat history management.
 - 🔗 **Workflows**: Automate tasks using prompt chaining.
+- ⚙️ **JavaScript Code Execution**: Secure in-browser JavaScript processing with Web Worker isolation and built-in templates.
+- 🌐 **Web Integration**: HTTP requests and web search capabilities for dynamic data processing.
 - ⏰ **Scheduled Workflows**: Automate workflows with cron-based scheduling.
 - 🎨 **Enhanced Node UI**: Color-coded handles and toggleable labels for better visual clarity.
 - 🔌 **Multi-LLM Support**: Works with OpenAI, Anthropic, and local LLMs.
@@ -40,10 +42,21 @@ That's it! You can start using the application immediately.
 
 ## 📝 How to Use (主な機能)
 
+### Core Features
 - **Settings (設定)**: Choose your LLM provider (like OpenAI) and enter your API key or endpoint. Test the connection to make sure it's working.
 - **Chat (チャット)**: Start a conversation with the AI. Your chat history is saved automatically.
 - **Workflow (ワークフロー)**: Define a series of prompts to automate a complex task. Input your data, select a workflow, and run it.
 - **Data (データ)**: View, export, or back up your conversation history and other data.
+
+### Advanced Node Types
+- **⚙️ JavaScript Code Execution**: Process data with custom JavaScript code in a secure sandboxed environment
+  - Built-in templates for JSON filtering, text processing, data aggregation
+  - Web Worker isolation for security and performance
+  - 5-second timeout protection and memory limits
+- **🌐 Web Integration Nodes**: 
+  - HTTP Request Node: Make API calls with customizable headers and methods
+  - Web Search Node: Search Google, Brave, or Bing directly from your workflows
+- **🔄 Control Flow**: If/While conditions, variable management, and scheduled execution
 
 ## 🧑‍💻 For Developers (開発者向け)
 
@@ -92,6 +105,8 @@ This repository includes automated CI/CD workflows using GitHub Actions:
 - Your API keys are stored only in your browser's LocalStorage.
 - All data processing happens on the client-side (in your browser).
 - No data is ever sent to or stored on a server.
+- JavaScript code execution is sandboxed using Web Workers with restricted global access.
+- Timeout protection prevents infinite loops and resource exhaustion.
 
 ## 📄 License (ライセンス)
 
