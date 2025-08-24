@@ -668,7 +668,7 @@ const ReactFlowEditor = ({ selectedNode, onSelectedNodeChange, onEditingNodeChan
               onChange={(e) => setShowHandleLabels(e.target.checked)}
               style={{ marginRight: '8px' }}
             />
-            ハンドルラベル表示
+Show Handle Labels
           </label>
         </div>
         </ReactFlow>
