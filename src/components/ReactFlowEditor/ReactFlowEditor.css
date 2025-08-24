@@ -151,7 +151,7 @@
     stroke-dashoffset: 0; 
   }
   100% { 
-    stroke-dashoffset: 15; 
+    stroke-dashoffset: -15; 
   }
 }
 

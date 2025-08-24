@@ -1,0 +1,37 @@
+{
+  "id": "06_test_file_download",
+  "name": "Test File Download",
+  "description": "Test workflow for file download feature",
+  "nodes": [
+    {
+      "id": "input-1",
+      "type": "input",
+      "position": { "x": 100, "y": 100 },
+      "data": {
+        "label": "Input",
+        "icon": "📝",
+        "inputType": "text",
+        "value": "This is a test text that will be downloaded as a file.\n\n=== Sample Content ===\n\nDate: {{DATE}}\nTime: {{TIME}}\n\nThis is line 1\nThis is line 2\nThis is line 3\n\nEnd of sample content."
+      }
+    },
+    {
+      "id": "output-1",
+      "type": "output",
+      "position": { "x": 400, "y": 100 },
+      "data": {
+        "label": "Output",
+        "icon": "📤",
+        "format": "text"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-1",
+      "source": "input-1",
+      "target": "output-1",
+      "sourceHandle": "0",
+      "targetHandle": "0"
+    }
+  ]
+}
