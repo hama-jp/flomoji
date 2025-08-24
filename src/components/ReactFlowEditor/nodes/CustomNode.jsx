@@ -2,9 +2,11 @@ import React, { memo } from 'react';
 import { Handle, Position } from '@xyflow/react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import useExecutionStore from '../../../store/executionStore';
+import { useHandleLabels } from '../../../contexts/HandleLabelsContext.jsx';
 
 const CustomNode = ({ data, children, id }) => {
   const executionState = useExecutionStore(state => state.executionState);
+  const showHandleLabels = useHandleLabels();
   
   // 実行状態をチェック  
   const isRunning = executionState?.running;
@@ -42,6 +44,17 @@ const CustomNode = ({ data, children, id }) => {
   const finalInputs = inputs.length > 0 ? inputs : defaultInputs;
   const finalOutputs = outputs.length > 0 ? outputs : defaultOutputs;
   
+  // デバッグログ - ハンドル設定を確認
+  console.log(`Node ${id} - Handles debug:`, {
+    label: data.label,
+    inputsFromData: inputs,
+    outputsFromData: outputs,
+    finalInputs,
+    finalOutputs,
+    inputsLength: finalInputs.length,
+    outputsLength: finalOutputs.length
+  });
+  
   // ハンドル数に基づく高さの計算
   const maxHandles = Math.max(finalInputs.length, finalOutputs.length);
   const minHeightClass = maxHandles >= 4 ? 'min-h-48' : 'min-h-32';
@@ -63,7 +76,7 @@ const CustomNode = ({ data, children, id }) => {
   }
 
   return (
-    <div className={`relative bg-white border-2 ${borderClass} rounded-lg ${shadowClass} ${animationClass} w-fit min-w-64 ${minHeightClass} transition-all duration-300 overflow-hidden`}>
+    <div className={`relative bg-white border-2 ${borderClass} rounded-lg ${shadowClass} ${animationClass} w-fit min-w-64 ${minHeightClass} transition-all duration-300 overflow-visible`}>
       {/* Input handles */}
       {finalInputs.map((input, index) => (
         <React.Fragment key={input.id || `input-${index}`}>
@@ -71,19 +84,26 @@ const CustomNode = ({ data, children, id }) => {
             type="target"
             position={Position.Left}
             id={input.id || `input-${index}`}
-            className="w-6 h-6 bg-blue-500 border-2 border-white rounded-full hover:bg-blue-600 transition-colors"
+            className="w-6 h-6 bg-indigo-500 border-2 border-white rounded-full hover:bg-indigo-600 transition-colors"
             style={{ 
               top: `calc(25% + 20px + ${index * 25}px)`,
               left: 0,
-              transform: 'translate(-50%, -50%)'
+              transform: 'translate(-50%, -50%)',
+              backgroundColor: '#6366f1',
+              width: '13px',
+              height: '13px',
+              border: '2px solid white'
             }}
           />
-          <span className="absolute text-xs text-gray-600 whitespace-nowrap" style={{
-            top: `calc(25% + 20px + ${index * 25}px - 8px)`,
-            left: '-30px'
-          }}>
-            {input.name === 'input' ? 'in' : input.name === 'output' ? 'out' : input.name.replace('input', 'in')}
-          </span>
+          {showHandleLabels && (
+            <span className="absolute text-xs text-gray-700 font-medium whitespace-nowrap bg-white px-1 rounded border shadow-sm" style={{
+              top: `calc(25% + 20px + ${index * 25}px - 8px)`,
+              left: '-60px',
+              zIndex: 10
+            }}>
+              {input.name || `in${index + 1}`}
+            </span>
+          )}
         </React.Fragment>
       ))}
 
@@ -94,19 +114,26 @@ const CustomNode = ({ data, children, id }) => {
             type="source"
             position={Position.Right}
             id={output.id || `output-${index}`}
-            className="w-6 h-6 bg-green-500 border-2 border-white rounded-full hover:bg-green-600 transition-colors"
+            className="w-6 h-6 bg-emerald-500 border-2 border-white rounded-full hover:bg-emerald-600 transition-colors"
             style={{ 
               top: `calc(25% + 20px + ${index * 25}px)`,
               right: 0,
-              transform: 'translate(50%, -50%)'
+              transform: 'translate(50%, -50%)',
+              backgroundColor: '#10b981',
+              width: '13px',
+              height: '13px',
+              border: '2px solid white'
             }}
           />
-          <span className="absolute text-xs text-gray-600 whitespace-nowrap" style={{
-            top: `calc(25% + 20px + ${index * 25}px - 8px)`,
-            right: '-30px'
-          }}>
-            {output.name === 'input' ? 'in' : output.name === 'output' ? 'out' : output.name.replace('input', 'in').replace('output', 'out')}
-          </span>
+          {showHandleLabels && (
+            <span className="absolute text-xs text-gray-700 font-medium whitespace-nowrap bg-white px-1 rounded border shadow-sm" style={{
+              top: `calc(25% + 20px + ${index * 25}px - 8px)`,
+              right: '-60px',
+              zIndex: 10
+            }}>
+              {output.name || `out${index + 1}`}
+            </span>
+          )}
         </React.Fragment>
       ))}
 

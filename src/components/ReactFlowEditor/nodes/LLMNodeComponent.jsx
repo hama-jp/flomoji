@@ -11,8 +11,16 @@ const LLMNodeComponent = ({ id, data }) => {
     updateNodeData(id, { systemPrompt: newValue });
   };
 
+  // LLMNodeのハンドル設定を明示
+  const nodeDataWithHandles = {
+    ...data,
+    inputs: [{ name: 'prompt', id: '0' }], // プロンプト入力
+    outputs: [{ name: 'response', id: '0' }], // レスポンス出力
+    colorClass: 'bg-gradient-to-r from-blue-500 to-purple-600 text-white'
+  };
+
   return (
-    <CustomNode data={data} id={id}>
+    <CustomNode data={nodeDataWithHandles} id={id}>
       <div className="space-y-3">
         <div>
           <label className="text-xs text-gray-500 block mb-1">System Prompt</label>

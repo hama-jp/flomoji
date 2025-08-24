@@ -11,6 +11,8 @@ import TextCombinerNode from './TextCombinerNode.js';
 import IfNode from './IfNode.js';
 import WhileNode from './WhileNode.js';
 import VariableSetNode from './VariableSetNode.js';
+import ScheduleNode from './ScheduleNode.js';
+import TimestampNode from './TimestampNode.js';
 
 /**
  * 全てのノードタイプの定義を統合
@@ -23,7 +25,9 @@ export const nodeTypes = {
   text_combiner: TextCombinerNode,
   if: IfNode,
   while: WhileNode,
-  variable_set: VariableSetNode
+  variable_set: VariableSetNode,
+  schedule: ScheduleNode,
+  timestamp: TimestampNode
 };
 
 /**
@@ -35,7 +39,8 @@ export const nodesByCategory = {
     name: 'Input/Output',
     nodes: {
       input: InputNode,
-      output: OutputNode
+      output: OutputNode,
+      timestamp: TimestampNode
     }
   },
   'ai': {
@@ -54,7 +59,8 @@ export const nodesByCategory = {
     name: 'Control Flow',
     nodes: {
       if: IfNode,
-      while: WhileNode
+      while: WhileNode,
+      schedule: ScheduleNode
     }
   },
   'variables': {
@@ -71,11 +77,13 @@ export const nodesByCategory = {
 export const nodeTypesList = [
   'input',
   'output', 
+  'timestamp',
   'llm',
   'text_combiner',
   'if',
   'while',
-  'variable_set'
+  'variable_set',
+  'schedule'
 ];
 
 export default nodeTypes;

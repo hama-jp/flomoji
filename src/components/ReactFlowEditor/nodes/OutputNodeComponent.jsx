@@ -38,8 +38,16 @@ const OutputNodeComponent = ({ id, data }) => {
     URL.revokeObjectURL(url);
   };
   
+  // OutputNodeのハンドル設定を明示
+  const nodeDataWithHandles = {
+    ...data,
+    inputs: [{ name: 'input', id: '0' }], // 入力あり
+    outputs: [], // 出力なし
+    colorClass: 'bg-gradient-to-r from-purple-400 to-purple-600 text-white'
+  };
+
   return (
-    <CustomNode data={data} id={id}>
+    <CustomNode data={nodeDataWithHandles} id={id}>
       <div className="space-y-2">
         <Textarea
           value={displayResult}
