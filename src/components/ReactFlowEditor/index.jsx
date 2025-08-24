@@ -61,7 +61,7 @@ const edgeTypes = {
   custom: CustomEdge,
 };
 
-const ReactFlowEditor = ({ selectedNode, onSelectedNodeChange, editingNode, onEditingNodeChange }) => {
+const ReactFlowEditor = ({ selectedNode, onSelectedNodeChange, onEditingNodeChange }) => {
   // 個別のセレクターを使用してZustandストアから値を取得
   const rawNodes = useReactFlowStore(selectNodes);
   const rawEdges = useReactFlowStore(selectEdges);
@@ -101,7 +101,7 @@ const ReactFlowEditor = ({ selectedNode, onSelectedNodeChange, editingNode, onEd
   const setContextMenu = useUIStore(state => state.setContextMenu);
   const setEditingNode = useUIStore(state => state.setEditingNode);
   // selectedNodeとonSelectedNodeChangeはpropsから受け取る
-  const { screenToFlowPosition, setViewport: setRfViewport } = useReactFlow();
+  const { screenToFlowPosition } = useReactFlow();
   const [currentWorkflow, setCurrentWorkflow] = useState(null);
   const [workflows, setWorkflows] = useState([]);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -404,24 +404,7 @@ const ReactFlowEditor = ({ selectedNode, onSelectedNodeChange, editingNode, onEd
     setWorkflows(Object.values(workflowsData));
   }, [currentWorkflow]);
 
-  // プロパティ変更をReactFlowストアに反映
-  const handleEditingNodeChange = useCallback((updatedNode) => {
-    if (!updatedNode) {
-      onEditingNodeChange?.(null);
-      return;
-    }
-    
-    // ReactFlowストアのノードを更新
-    setNodes(prevNodes => {
-      if (!Array.isArray(prevNodes)) return [];
-      return prevNodes.map(node => 
-        node.id === updatedNode.id ? updatedNode : node
-      );
-    });
-    
-    // 編集中ノードも更新
-    onEditingNodeChange?.(updatedNode);
-  }, [setNodes, onEditingNodeChange]);
+  // プロパティ変更をReactFlowストアに反映する関数は不要になったため削除
 
   const { handleRunAll, handleStepForward, handleResetExecution } = useWorkflowExecution({
     nodes,

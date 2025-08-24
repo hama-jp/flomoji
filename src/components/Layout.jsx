@@ -6,9 +6,7 @@ import { useStore, selectSidebarOpen, useUIActions } from '../store/index.js'
 import NodePaletteContextStyle from './NodePaletteContextStyle.jsx'
 
 const NodePropertiesPanel = ({ editingNode, onEditingNodeChange }) => {
-  if (!editingNode) return null;
-
-  // ウィンドウサイズを監視してテキストエリアの高さを動的調整
+  // React Hooksは条件の前に配置する必要があります
   const [windowHeight, setWindowHeight] = useState(window.innerHeight);
 
   useEffect(() => {
@@ -26,6 +24,9 @@ const NodePropertiesPanel = ({ editingNode, onEditingNodeChange }) => {
     const minHeight = minRows * 20; // 1行あたり約20px
     return Math.max(baseHeight, minHeight);
   }, [windowHeight]);
+
+  // 条件付きレンダーは全てのHooksの後に配置
+  if (!editingNode) return null;
 
   const handleDataChange = (partialData) => {
     if (!editingNode) return;

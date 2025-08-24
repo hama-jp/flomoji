@@ -43,6 +43,13 @@ const createUISlice = (set) => ({
     'ui/setContextMenu'
   ),
 
+  // デバッグログ表示
+  showDebugLog: false,
+  setShowDebugLog: (show) => set(
+    () => ({ showDebugLog: show }),
+    false,
+    'ui/setShowDebugLog'
+  ),
 
   // UI状態のリセット
   resetUI: () => set(
@@ -51,7 +58,8 @@ const createUISlice = (set) => ({
       sidebarOpen: true,
       selectedNode: null,
       editingNode: null,
-      contextMenu: null
+      contextMenu: null,
+      showDebugLog: false
     }),
     false,
     'ui/reset'

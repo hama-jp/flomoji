@@ -7,7 +7,6 @@ import { Badge } from '@/components/ui/badge';
 
 const ExecutionOutputWindow = ({ 
   isOpen, 
-  onClose, 
   executionResult, 
   debugLog, 
   executionState 

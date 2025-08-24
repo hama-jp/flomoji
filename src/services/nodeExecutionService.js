@@ -233,31 +233,34 @@ class NodeExecutionService {
     
     nodes.forEach(node => {
       switch (node.type) {
-        case 'if':
+        case 'if': {
           // ifノードは条件判定のための入力が必要
           const ifInputs = getTargetConnections(node.id)
           if (ifInputs.length === 0) {
             errors.push(`🔀 IF条件ノード "${node.data.label || node.id}" には条件判定のための入力接続が必要です`)
           }
           break
+        }
           
-        case 'while':
+        case 'while': {
           // whileノードは条件判定とループ本体の入力が必要
           const whileInputs = getTargetConnections(node.id)
           if (whileInputs.length === 0) {
             errors.push(`🔄 WHILEループノード "${node.data.label || node.id}" には条件判定のための入力接続が必要です`)
           }
           break
+        }
           
-        case 'text_combiner':
+        case 'text_combiner': {
           // text_combinerは複数の入力が必要
           const combinerInputs = getTargetConnections(node.id)
           if (combinerInputs.length < 2) {
             errors.push(`📝 テキスト結合ノード "${node.data.label || node.id}" には少なくとも2つの入力接続が必要です (現在: ${combinerInputs.length})`)
           }
           break
+        }
           
-        case 'llm':
+        case 'llm': {
           // LLMノードは入力が必要（システムプロンプトまたは入力接続）
           const llmInputs = getTargetConnections(node.id)
           const hasSystemPrompt = node.data.systemPrompt && node.data.systemPrompt.trim()
@@ -265,14 +268,16 @@ class NodeExecutionService {
             errors.push(`🤖 LLMノード "${node.data.label || node.id}" にはシステムプロンプトまたは入力接続が必要です`)
           }
           break
+        }
           
-        case 'output':
+        case 'output': {
           // outputノードは最低1つの入力が必要
           const outputInputs = getTargetConnections(node.id)
           if (outputInputs.length === 0) {
             errors.push(`📤 出力ノード "${node.data.label || node.id}" には入力接続が必要です`)
           }
           break
+        }
       }
     })
     

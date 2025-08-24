@@ -1,6 +1,5 @@
 import { useCallback } from 'react'
 import nodeExecutionService from '../services/nodeExecutionService.js'
-import useReactFlowStore from '../store/reactFlowStore.js'
 
 const useWorkflowExecution = ({
   nodes,

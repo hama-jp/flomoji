@@ -19,15 +19,16 @@ describe('workflowManagerService', () => {
     localStorageMock.clear();
   });
 
-  it('should initialize with a new workflow if none exists', () => {
-    // Re-instantiate to test constructor logic
+  it('should initialize with sample workflows when none exist', async () => {
+    // Create fresh instance and initialize
     const newServiceInstance = new (workflowManagerService.constructor)();
-    expect(localStorageMock.setItem).toHaveBeenCalledWith(expect.stringContaining('llm-agent-workflows'), expect.any(String));
+    await newServiceInstance.initialize();
+    
+    // After initialization, should have sample workflows loaded
     const workflows = newServiceInstance.getWorkflows();
-    expect(Object.keys(workflows).length).toBe(1);
-    const newWorkflowId = newServiceInstance.getCurrentWorkflowId();
-    expect(newWorkflowId).not.toBeNull();
-    expect(workflows[newWorkflowId].name).toBe('新規フロー');
+    expect(Object.keys(workflows).length).toBeGreaterThan(0);
+    const currentWorkflowId = newServiceInstance.getCurrentWorkflowId();
+    expect(currentWorkflowId).not.toBeNull();
   });
 
   it('should save and retrieve a workflow', () => {

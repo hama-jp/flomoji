@@ -177,7 +177,7 @@ class LLMService {
     switch (provider) {
       case 'openai':
       case 'local':
-      case 'custom':
+      case 'custom': {
         const result = data.choices?.[0]?.message?.content || 'レスポンスが空です';
         
         // デバッグ: APIレスポンス詳細を表示（一時的）
@@ -198,7 +198,7 @@ class LLMService {
         }
         
         return result;
-
+      }
       case 'anthropic':
         return data.content?.[0]?.text || 'レスポンスが空です'
 

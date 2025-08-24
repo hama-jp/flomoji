@@ -12,10 +12,9 @@ import { createNodeDefinition } from './types.js';
  * 
  * @param {Object} node - ノードオブジェクト
  * @param {Object} inputs - 入力データ
- * @param {Object} context - 実行コンテキスト
  * @returns {Promise<Object>} 条件分岐結果 { true: value|null, false: value|null }
  */
-async function executeIfNode(node, inputs, context) {
+async function executeIfNode(node, inputs) {
   // 注意：If条件分岐は複雑な制御フローのため、
   // nodeExecutionService.js の executeIfNode を使用します
   // この実行メソッドは placeholder として存在します
