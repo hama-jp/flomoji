@@ -19,6 +19,7 @@ import ScheduleNodeComponent from './nodes/ScheduleNodeComponent';
 import TimestampNodeComponent from './nodes/TimestampNodeComponent';
 import HTTPRequestNodeComponent from './nodes/HTTPRequestNodeComponent';
 import WebSearchNodeComponent from './nodes/WebSearchNodeComponent';
+import CodeExecutionNodeComponent from './nodes/CodeExecutionNodeComponent';
 import CustomNode from './nodes/CustomNode';
 import CustomEdge from './edges/CustomEdge';
 import ContextMenu from './ContextMenu';
@@ -63,6 +64,7 @@ const nodeTypes = {
   schedule: ScheduleNodeComponent,
   http_request: HTTPRequestNodeComponent,
   web_search: WebSearchNodeComponent,
+  code_execution: CodeExecutionNodeComponent,
   // 他の未実装ノードタイプはCustomNodeで処理
 };
 
