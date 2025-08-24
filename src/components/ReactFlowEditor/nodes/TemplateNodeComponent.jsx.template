@@ -1,0 +1,233 @@
+/**
+ * ノードUIコンポーネントテンプレート
+ * 
+ * 使用方法:
+ * 1. このファイルをコピーして、新しいノード名に変更（例: MyCustomNodeComponent.jsx）
+ * 2. %%NODE_NAME%% を実際のノード名に置換
+ * 3. %%ICON%% を適切な絵文字に置換
+ * 4. %%COLOR_GRADIENT%% をグラデーション設定に置換
+ * 5. UIコンポーネントを実装
+ * 6. src/components/ReactFlowEditor/index.jsx にインポートと登録を追加
+ */
+
+import React, { memo, useState } from 'react';
+import CustomNode from './CustomNode';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Slider } from '@/components/ui/slider';
+import { Checkbox } from '@/components/ui/checkbox';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import useReactFlowStore from '../../../store/reactFlowStore';
+
+const %%NODE_NAME%%NodeComponent = memo(({ data = {}, id }) => {
+  // 状態管理
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const updateNodeData = useReactFlowStore(state => state.updateNodeData);
+
+  // データ更新ヘルパー
+  const updateData = (field, value) => {
+    updateNodeData(id, { [field]: value });
+  };
+
+  // 複数フィールドを一度に更新
+  const updateMultipleData = (updates) => {
+    updateNodeData(id, updates);
+  };
+
+  // ハンドル設定
+  // CustomNodeに渡すデータ構造
+  const nodeDataWithHandles = {
+    ...data,
+    label: '%%NODE_NAME%%',        // ノードのタイトル
+    icon: '%%ICON%%',              // ノードのアイコン
+    inputs: [
+      { name: 'input', id: 'input' }
+      // 複数の入力が必要な場合は追加
+      // { name: 'config', id: 'config' },
+      // { name: 'template', id: 'template' }
+    ],
+    outputs: [
+      { name: 'output', id: 'output' },
+      { name: 'error', id: 'error' }
+      // 複数の出力が必要な場合は追加
+      // { name: 'metadata', id: 'metadata' }
+    ],
+    colorClass: '%%COLOR_GRADIENT%%'  // 例: 'bg-gradient-to-br from-blue-400 to-blue-600 text-white'
+  };
+
+  return (
+    <CustomNode data={nodeDataWithHandles} id={id}>
+      <div className="space-y-3 w-80">
+        
+        {/* ==========================================
+            基本的なUI要素の例
+            必要に応じて選択・組み合わせて使用
+        ========================================== */}
+
+        {/* テキスト入力 */}
+        <div className="space-y-2">
+          <Label className="text-xs text-gray-600">設定名</Label>
+          <Input
+            type="text"
+            placeholder="値を入力..."
+            value={data.setting1 || ''}
+            onChange={(e) => updateData('setting1', e.target.value)}
+            className="text-xs h-8 nodrag"
+          />
+        </div>
+
+        {/* テキストエリア */}
+        <div className="space-y-2">
+          <Label className="text-xs text-gray-600">詳細設定</Label>
+          <Textarea
+            placeholder="複数行のテキスト..."
+            value={data.longText || ''}
+            onChange={(e) => updateData('longText', e.target.value)}
+            className="text-sm min-h-[60px] nodrag"
+            rows={3}
+          />
+        </div>
+
+        {/* セレクトボックス */}
+        <div className="space-y-2">
+          <Label className="text-xs text-gray-600">オプション選択</Label>
+          <Select value={data.option || 'default'} onValueChange={(value) => updateData('option', value)}>
+            <SelectTrigger className="w-full h-8">
+              <SelectValue placeholder="選択してください" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="option1">オプション1</SelectItem>
+              <SelectItem value="option2">オプション2</SelectItem>
+              <SelectItem value="option3">オプション3</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* 数値入力 */}
+        <div className="space-y-2">
+          <Label className="text-xs text-gray-600">数値設定</Label>
+          <Input
+            type="number"
+            value={data.numberValue || 0}
+            onChange={(e) => updateData('numberValue', parseInt(e.target.value) || 0)}
+            className="text-xs h-8 nodrag"
+            min="0"
+            max="100"
+            step="1"
+          />
+        </div>
+
+        {/* スライダー */}
+        <div className="space-y-2">
+          <Label className="text-xs text-gray-600">
+            スライダー設定: {data.sliderValue || 50}
+          </Label>
+          <Slider
+            value={[data.sliderValue || 50]}
+            onValueChange={([value]) => updateData('sliderValue', value)}
+            max={100}
+            step={1}
+            className="nodrag"
+          />
+        </div>
+
+        {/* スイッチ */}
+        <div className="flex items-center justify-between">
+          <Label htmlFor="enableFeature" className="text-xs">
+            機能を有効化
+          </Label>
+          <Switch
+            id="enableFeature"
+            checked={data.enableFeature || false}
+            onCheckedChange={(checked) => updateData('enableFeature', checked)}
+          />
+        </div>
+
+        {/* チェックボックス */}
+        <div className="flex items-center space-x-2">
+          <Checkbox
+            id="agree"
+            checked={data.agree || false}
+            onCheckedChange={(checked) => updateData('agree', checked)}
+          />
+          <Label htmlFor="agree" className="text-xs">
+            条件に同意する
+          </Label>
+        </div>
+
+        {/* ラジオボタン */}
+        <div className="space-y-2">
+          <Label className="text-xs text-gray-600">選択肢</Label>
+          <RadioGroup
+            value={data.radioOption || 'option1'}
+            onValueChange={(value) => updateData('radioOption', value)}
+          >
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="option1" id="r1" />
+              <Label htmlFor="r1" className="text-xs">オプション1</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="option2" id="r2" />
+              <Label htmlFor="r2" className="text-xs">オプション2</Label>
+            </div>
+          </RadioGroup>
+        </div>
+
+        {/* 折りたたみ可能な詳細設定 */}
+        <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
+          <CollapsibleTrigger asChild>
+            <Button variant="ghost" className="w-full justify-between h-8 px-2">
+              <span className="text-xs">詳細設定</span>
+              {showAdvanced ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="space-y-3 pt-2">
+            {/* 詳細設定のUI要素をここに配置 */}
+            <div className="space-y-2">
+              <Label className="text-xs text-gray-600">高度な設定</Label>
+              <Input
+                type="text"
+                placeholder="高度な設定値..."
+                value={data.advancedSetting || ''}
+                onChange={(e) => updateData('advancedSetting', e.target.value)}
+                className="text-xs h-8 nodrag"
+              />
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+
+        {/* 警告・情報表示 */}
+        {data.showWarning && (
+          <div className="flex items-start gap-2 p-2 bg-yellow-50 rounded-md">
+            <AlertCircle className="w-4 h-4 text-yellow-600 mt-0.5" />
+            <p className="text-xs text-yellow-800">
+              警告メッセージをここに表示
+            </p>
+          </div>
+        )}
+
+        {/* ステータス表示 */}
+        <div className="flex justify-between items-center pt-2 border-t">
+          <Badge variant="outline" className="text-xs">
+            ステータス
+          </Badge>
+          <span className="text-xs text-gray-500">
+            {data.status || '未設定'}
+          </span>
+        </div>
+
+      </div>
+    </CustomNode>
+  );
+});
+
+%%NODE_NAME%%NodeComponent.displayName = '%%NODE_NAME%%NodeComponent';
+
+export default %%NODE_NAME%%NodeComponent;

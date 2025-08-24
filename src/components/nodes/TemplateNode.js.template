@@ -1,0 +1,106 @@
+/**
+ * ノード定義テンプレート
+ * 
+ * 使用方法:
+ * 1. このファイルをコピーして、新しいノード名に変更（例: MyCustomNode.js）
+ * 2. %%NODE_NAME%% を実際のノード名に置換
+ * 3. %%ICON%% を適切な絵文字に置換
+ * 4. %%COLOR%% を色名に置換（blue, green, orange, teal, pink, purple, amber, cyan）
+ * 5. execute関数に実際の処理ロジックを実装
+ * 6. src/components/nodes/index.js にインポートと登録を追加
+ */
+
+import { createNodeDefinition } from './types.js';
+
+/**
+ * ノードの実行ロジック
+ * @param {Object} data - ノードの設定データ（UIから設定された値）
+ * @param {Object} inputs - 入力ポートから受け取ったデータ
+ * @returns {Object} 出力ポートに渡すデータ
+ */
+export async function execute%%NODE_NAME%%Node(data, inputs) {
+  // デフォルト値を含む設定の取得
+  const {
+    // 例: setting1 = 'default value',
+    // 例: setting2 = 100,
+    // 例: enableFeature = true
+  } = data;
+
+  // 入力データの取得と検証
+  // const inputData = inputs.input || data.defaultInput;
+  
+  // if (!inputData) {
+  //   throw new Error('入力データが必要です');
+  // }
+
+  try {
+    // ==========================================
+    // ここに実際の処理ロジックを実装
+    // ==========================================
+    
+    // 例: 非同期処理
+    // const result = await someAsyncOperation(inputData);
+    
+    // 例: 同期処理
+    // const processedData = processData(inputData);
+    
+    // 例: 外部APIの呼び出し
+    // const response = await fetch(apiUrl, {
+    //   method: 'POST',
+    //   headers: { 'Content-Type': 'application/json' },
+    //   body: JSON.stringify({ data: inputData })
+    // });
+    // const result = await response.json();
+
+    // 成功時の戻り値
+    // 複数の出力ポートがある場合は、それぞれに対応する値を返す
+    return {
+      output: 'processed result',
+      // metadata: { ... },
+      // error: null
+    };
+    
+  } catch (error) {
+    // エラー処理
+    console.error('%%NODE_NAME%% Node Error:', error);
+    
+    // エラー時の戻り値
+    return {
+      output: null,
+      error: error.message
+    };
+  }
+}
+
+// ノード定義
+export const %%NODE_NAME%%Node = createNodeDefinition(
+  '%%NODE_NAME%%',           // ノードの表示名
+  '%%ICON%%',                 // ノードのアイコン（絵文字）
+  '%%COLOR%%',                // ノードの色
+  
+  // 入力ポート定義
+  // 複数の入力が必要な場合は配列に追加
+  ['input'],                  // 例: ['input', 'config', 'template']
+  
+  // 出力ポート定義
+  // 複数の出力が必要な場合は配列に追加
+  ['output', 'error'],        // 例: ['output', 'metadata', 'error']
+  
+  // デフォルト設定値
+  {
+    // setting1: 'default value',
+    // setting2: 100,
+    // enableFeature: true
+  },
+  
+  // 実行関数
+  execute%%NODE_NAME%%Node,
+  
+  // メタデータ
+  {
+    description: 'このノードの説明を記載',
+    category: 'general'  // カテゴリー: ai, text-processing, control-flow, web-integration, variables, input-output
+  }
+);
+
+export default %%NODE_NAME%%Node;

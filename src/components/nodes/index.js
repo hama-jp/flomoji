@@ -13,6 +13,8 @@ import WhileNode from './WhileNode.js';
 import VariableSetNode from './VariableSetNode.js';
 import ScheduleNode from './ScheduleNode.js';
 import TimestampNode from './TimestampNode.js';
+import HTTPRequestNode from './HTTPRequestNode.js';
+import WebSearchNode from './WebSearchNode.js';
 
 /**
  * 全てのノードタイプの定義を統合
@@ -27,7 +29,9 @@ export const nodeTypes = {
   while: WhileNode,
   variable_set: VariableSetNode,
   schedule: ScheduleNode,
-  timestamp: TimestampNode
+  timestamp: TimestampNode,
+  http_request: HTTPRequestNode,
+  web_search: WebSearchNode
 };
 
 /**
@@ -68,8 +72,15 @@ export const nodesByCategory = {
     nodes: {
       variable_set: VariableSetNode
     }
+  },
+  'web-integration': {
+    name: 'Web Integration',
+    nodes: {
+      http_request: HTTPRequestNode,
+      web_search: WebSearchNode
+    }
   }
-};
+};;
 
 /**
  * ノードタイプの配列（表示順序を制御可能）
@@ -83,7 +94,9 @@ export const nodeTypesList = [
   'if',
   'while',
   'variable_set',
-  'schedule'
+  'schedule',
+  'http_request',
+  'web_search'
 ];
 
 export default nodeTypes;

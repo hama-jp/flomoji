@@ -6,7 +6,9 @@ import { Label } from '@/components/ui/label.jsx'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card.jsx'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select.jsx'
 import { Alert, AlertDescription } from '@/components/ui/alert.jsx'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs.jsx'
 import llmService from '../services/llmService.js'
+import ApiKeysSettings from './ApiKeysSettings.jsx'
 
 const SettingsView = () => {
   const [settings, setSettings] = useState({
@@ -88,12 +90,19 @@ const SettingsView = () => {
   }
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>LLM Service Settings</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
+    <div className="max-w-4xl mx-auto space-y-6">
+      <Tabs defaultValue="llm" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="llm">LLM設定</TabsTrigger>
+          <TabsTrigger value="apikeys">APIキー管理</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="llm">
+          <Card>
+            <CardHeader>
+              <CardTitle>LLM Service Settings</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
           {/* バリデーションエラー表示 */}
           {validationErrors.length > 0 && (
             <Alert className="border-red-200 bg-red-50">
@@ -250,33 +259,39 @@ const SettingsView = () => {
               {isLoading ? 'Testing Connection...' : 'Test Connection'}
             </Button>
           </div>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
 
-      {/* 使用方法の説明 */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Usage Instructions</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3 text-sm text-gray-600">
-          <div>
-            <h4 className="font-medium text-gray-800 mb-1">OpenAI:</h4>
-            <p>Obtain an OpenAI API key and enter it above.</p>
-          </div>
-          <div>
-            <h4 className="font-medium text-gray-800 mb-1">Anthropic:</h4>
-            <p>Obtain an Anthropic API key and enter it above.</p>
-          </div>
-          <div>
-            <h4 className="font-medium text-gray-800 mb-1">Local LLM:</h4>
-            <p>Configure endpoints for local servers like LM Studio, Ollama, or text-generation-webui.</p>
-          </div>
-          <div>
-            <h4 className="font-medium text-gray-800 mb-1">Custom API:</h4>
-            <p>Configure endpoints for OpenAI-compatible APIs.</p>
-          </div>
-        </CardContent>
-      </Card>
+          {/* 使用方法の説明 */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Usage Instructions</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm text-gray-600">
+              <div>
+                <h4 className="font-medium text-gray-800 mb-1">OpenAI:</h4>
+                <p>Obtain an OpenAI API key and enter it above.</p>
+              </div>
+              <div>
+                <h4 className="font-medium text-gray-800 mb-1">Anthropic:</h4>
+                <p>Obtain an Anthropic API key and enter it above.</p>
+              </div>
+              <div>
+                <h4 className="font-medium text-gray-800 mb-1">Local LLM:</h4>
+                <p>Configure endpoints for local servers like LM Studio, Ollama, or text-generation-webui.</p>
+              </div>
+              <div>
+                <h4 className="font-medium text-gray-800 mb-1">Custom API:</h4>
+                <p>Configure endpoints for OpenAI-compatible APIs.</p>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="apikeys">
+          <ApiKeysSettings />
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
