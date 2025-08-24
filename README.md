@@ -13,6 +13,8 @@ flomojiは、複雑な環境構築なしにAIとの対話やワークフロー�
 - 🚀 **Browser-only**: No installation required, runs directly in your browser.
 - 💬 **AI Chat**: Real-time conversations with AI, with chat history management.
 - 🔗 **Workflows**: Automate tasks using prompt chaining.
+- ⏰ **Scheduled Workflows**: Automate workflows with cron-based scheduling.
+- 🎨 **Enhanced Node UI**: Color-coded handles and toggleable labels for better visual clarity.
 - 🔌 **Multi-LLM Support**: Works with OpenAI, Anthropic, and local LLMs.
 - 📊 **Data Management**: Easily manage and export your data.
 
