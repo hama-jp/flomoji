@@ -174,8 +174,9 @@ const Layout = ({ children, currentView, onViewChange, editingNode, onEditingNod
   ]
 
   return (
-    <div className="h-screen flex bg-gray-50">
-      <div className={`${sidebarOpen ? 'w-64' : 'w-0'} transition-all duration-300 bg-white shadow-lg flex flex-col`}>
+    <div className="h-screen flex bg-gray-100" style={{ padding: '5px' }}>
+      <div className="flex flex-1 bg-gray-50 rounded-lg overflow-hidden shadow-sm">
+        <div className={`${sidebarOpen ? 'w-64' : 'w-0'} transition-all duration-300 bg-white shadow-lg flex flex-col rounded-l-lg`}>
         <div className="p-4 border-b">
           <div className="flex items-center justify-between">
             <h1 className="text-xl font-bold text-gray-800">🌊 flomoji</h1>
@@ -222,6 +223,7 @@ const Layout = ({ children, currentView, onViewChange, editingNode, onEditingNod
         <main className="flex-1 overflow-auto">
           {children}
         </main>
+      </div>
       </div>
     </div>
   )
