@@ -11,8 +11,16 @@ const InputNodeComponent = ({ id, data }) => {
     updateNodeData(id, { value: newValue });
   };
 
+  // InputNodeのハンドル設定を明示
+  const nodeDataWithHandles = {
+    ...data,
+    inputs: [], // 入力なし
+    outputs: [{ name: 'output', id: '0' }], // 出力あり
+    colorClass: 'bg-gradient-to-r from-orange-400 to-orange-600 text-white'
+  };
+
   return (
-    <CustomNode data={data} id={id}>
+    <CustomNode data={nodeDataWithHandles} id={id}>
       <Textarea
         value={data.value || ''}
         onChange={onChange}

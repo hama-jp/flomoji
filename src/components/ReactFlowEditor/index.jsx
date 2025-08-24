@@ -15,6 +15,8 @@ import WhileNodeComponent from './nodes/WhileNodeComponent';
 import TextNodeComponent from './nodes/TextNodeComponent';
 import TextCombinerNodeComponent from './nodes/TextCombinerNodeComponent';
 import VariableSetNodeComponent from './nodes/VariableSetNodeComponent';
+import ScheduleNodeComponent from './nodes/ScheduleNodeComponent';
+import TimestampNodeComponent from './nodes/TimestampNodeComponent';
 import CustomNode from './nodes/CustomNode';
 import CustomEdge from './edges/CustomEdge';
 import ContextMenu from './ContextMenu';
@@ -24,6 +26,7 @@ import WorkflowToolbar from '../WorkflowToolbar';
 import { nodeTypes as nodeDefinitions } from '../nodes/index.js';
 import useWorkflowExecution from '../../hooks/useWorkflowExecution';
 import workflowManagerService from '../../services/workflowManagerService';
+import schedulerService from '../../services/schedulerService';
 import { debounce } from '../../lib/utils';
 
 // 個別のセレクター関数を定義
@@ -48,12 +51,14 @@ const selectSetDebugLog = (state) => state.setDebugLog;
 const nodeTypes = {
   input: InputNodeComponent,
   output: OutputNodeComponent,
+  timestamp: TimestampNodeComponent,
   llm: LLMNodeComponent,
   if: IfNodeComponent,
   while: WhileNodeComponent,
   text: TextNodeComponent,
   text_combiner: TextCombinerNodeComponent,
   variable_set: VariableSetNodeComponent,
+  schedule: ScheduleNodeComponent,
   // 他の未実装ノードタイプはCustomNodeで処理
 };
 
@@ -61,6 +66,7 @@ const edgeTypes = {
   custom: CustomEdge,
 };
 
+import { HandleLabelsProvider } from '../../contexts/HandleLabelsContext.jsx';
 const ReactFlowEditor = ({ selectedNode, onSelectedNodeChange, onEditingNodeChange }) => {
   // 個別のセレクターを使用してZustandストアから値を取得
   const rawNodes = useReactFlowStore(selectNodes);
@@ -105,6 +111,7 @@ const ReactFlowEditor = ({ selectedNode, onSelectedNodeChange, onEditingNodeChan
   const [currentWorkflow, setCurrentWorkflow] = useState(null);
   const [workflows, setWorkflows] = useState([]);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [showHandleLabels, setShowHandleLabels] = useState(true);
 
   // Initial load effect
   useEffect(() => {
@@ -420,6 +427,70 @@ const ReactFlowEditor = ({ selectedNode, onSelectedNodeChange, onEditingNodeChan
     executor,
   });
 
+  // SchedulerService統合 - ワークフロー実行コールバックを設定
+  useEffect(() => {
+    const setupSchedulerIntegration = () => {
+      // ワークフロー実行コールバック
+      const workflowExecutionCallback = async (workflowId, scheduleConfig) => {
+        try {
+          console.log(`🕐 スケジュール実行開始: ${scheduleConfig.name} (${workflowId})`);
+          await handleRunAll();
+          console.log(`✅ スケジュール実行完了: ${scheduleConfig.name}`);
+        } catch (error) {
+          console.error(`❌ スケジュール実行エラー: ${scheduleConfig.name}`, error);
+          throw error;
+        }
+      };
+
+      // ワークフロー停止コールバック
+      const workflowStopCallback = (workflowId, reason) => {
+        console.log(`🛑 スケジュール実行停止: ${workflowId} (理由: ${reason})`);
+        if (executor) {
+          handleResetExecution();
+        }
+      };
+
+      schedulerService.setWorkflowExecutionCallback(workflowExecutionCallback);
+      schedulerService.setWorkflowStopCallback(workflowStopCallback);
+    };
+
+    setupSchedulerIntegration();
+  }, [handleRunAll, handleResetExecution, executor]);
+
+  // ScheduleNodeがワークフロー内にある場合、スケジュール設定を自動更新
+  useEffect(() => {
+    if (!currentWorkflow || !nodes.length) return;
+
+    const scheduleNodes = nodes.filter(node => node.type === 'schedule');
+    
+    scheduleNodes.forEach(scheduleNode => {
+      const { cronExpression, scheduleName, enabled, timeoutMinutes } = scheduleNode.data;
+      
+      if (enabled) {
+        const scheduleConfig = {
+          cronExpression,
+          name: scheduleName || `Schedule ${scheduleNode.id}`,
+          enabled: true,
+          timeoutMinutes: timeoutMinutes || 30,
+          workflowId: currentWorkflow.id,
+          nodeId: scheduleNode.id
+        };
+
+        console.log(`🔧 スケジュール設定を更新: ${scheduleConfig.name}`);
+        schedulerService.setSchedule(currentWorkflow.id, scheduleConfig);
+      } else {
+        // 無効化された場合はスケジュールを削除
+        schedulerService.removeSchedule(currentWorkflow.id);
+      }
+    });
+
+    // ScheduleNodeが削除された場合もスケジュールを削除
+    const hasScheduleNode = scheduleNodes.length > 0;
+    if (!hasScheduleNode) {
+      schedulerService.removeSchedule(currentWorkflow.id);
+    }
+  }, [nodes, currentWorkflow]);
+
   const onPaneContextMenu = useCallback(
     (event) => {
       event.preventDefault();
@@ -540,7 +611,8 @@ const ReactFlowEditor = ({ selectedNode, onSelectedNodeChange, onEditingNodeChan
         isExecuting={executionState?.running}
       />
       {console.log('🎨 ReactFlowコンポーネントをレンダリング中...')}
-      <ReactFlow
+      <HandleLabelsProvider showHandleLabels={showHandleLabels}>
+        <ReactFlow
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
@@ -576,7 +648,31 @@ const ReactFlowEditor = ({ selectedNode, onSelectedNodeChange, onEditingNodeChan
         <Background />
         <Controls />
         <MiniMap />
-      </ReactFlow>
+        
+        {/* Handle Labels Toggle */}
+        <div style={{ 
+          position: 'absolute',
+          bottom: '20px',
+          left: '60px',
+          zIndex: 10,
+          backgroundColor: 'rgba(255, 255, 255, 0.9)',
+          padding: '8px 12px',
+          borderRadius: '6px',
+          border: '1px solid #e5e7eb',
+          fontSize: '14px'
+        }}>
+          <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={showHandleLabels}
+              onChange={(e) => setShowHandleLabels(e.target.checked)}
+              style={{ marginRight: '8px' }}
+            />
+            ハンドルラベル表示
+          </label>
+        </div>
+        </ReactFlow>
+      </HandleLabelsProvider>
       <ContextMenu />
       
       {/* 実行結果ウィンドウ */}
