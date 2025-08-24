@@ -5,6 +5,7 @@
   "description": "🌊 flomoji - Visual LLM workflow builder for everyone",
   "author": "hama-jp",
   "license": "Apache-2.0",
+  "packageManager": "pnpm@10.4.1",
   "repository": {
     "type": "git",
     "url": "https://github.com/hama-jp/flomoji.git"
