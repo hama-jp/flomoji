@@ -4,13 +4,13 @@ import tailwindcss from '@tailwindcss/vite'
 import { fileURLToPath, URL } from 'node:url'
 
 // https://vitejs.dev/config/
-export default defineConfig({
-  base: './', // 相対パスに変更
+export default defineConfig(({ mode }) => ({
+  base: mode === 'production' ? '/flomoji/' : './',
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
     },
   },
-})
+}))
 

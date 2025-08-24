@@ -7,9 +7,9 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/hama-jp/llm-agent-lite.git"
+    "url": "https://github.com/hama-jp/flomoji.git"
   },
-  "homepage": "https://hama-jp.github.io/llm-agent-lite/",
+  "homepage": "https://hama-jp.github.io/flomoji/",
   "keywords": ["llm", "ai", "workflow", "automation", "browser-based", "no-code", "openai", "anthropic"],
   "type": "module",
   "scripts": {

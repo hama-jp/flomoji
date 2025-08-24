@@ -25,12 +25,12 @@ flomojiは、複雑な環境構築なしにAIとの対話やワークフロー�
 ## 🚀 Quick Start (利用方法)
 
 ### 🌐 Try Online (オンラインで試す)
-**Instant access**: [**👉 Launch flomoji**](https://hama-jp.github.io/llm-agent-lite/) - No download required!
+**Instant access**: [**👉 Launch flomoji**](https://hama-jp.github.io/flomoji/) - No download required!
 
 ### 📥 Download for Offline Use
 The easiest way to use flomoji locally is directly in your browser without any setup.
 
-1.  **Download**: [Click here to download the latest version.](https://github.com/hama-jp/llm-agent-lite/archive/refs/heads/gh-pages.zip)
+1.  **Download**: [Click here to download the latest version.](https://github.com/hama-jp/flomoji/archive/refs/heads/gh-pages.zip)
 2.  **Unzip**: Extract the downloaded ZIP file.
 3.  **Open**: Open the `index.html` file in your web browser (like Chrome, Firefox, or Edge).
 
@@ -63,6 +63,27 @@ Then, open `http://localhost:5173` in your browser.
 pnpm run build
 ```
 The output files will be in the `dist` folder. You can deploy this folder to any static hosting service.
+
+## 🚀 CI/CD Automation
+
+This repository includes automated CI/CD workflows using GitHub Actions:
+
+### Pull Request Workflow
+- **Quality Checks**: Automatic linting, testing, and building on every PR
+- **Auto Review**: Comments with quality check results
+- **Auto Merge**: Approved PRs are automatically merged after passing all checks
+
+### Deployment Workflow  
+- **Automatic Deployment**: Every merge to `main` triggers automatic deployment to GitHub Pages
+- **Build & Test**: Ensures all tests pass before deployment
+- **Live Updates**: Changes are automatically reflected at [https://hama-jp.github.io/flomoji/](https://hama-jp.github.io/flomoji/)
+
+### Contributing
+1. Create a feature branch from `main`
+2. Make your changes and commit
+3. Create a Pull Request
+4. The CI system will automatically run quality checks
+5. Once approved, the PR will be auto-merged and deployed
 
 ## 🔐 Security (セキュリティ)
 
