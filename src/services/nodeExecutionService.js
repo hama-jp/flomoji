@@ -543,7 +543,17 @@ class NodeExecutionService {
             valueToAssign, 
             sourcePortIndex 
           });
+        } else if (typeof sourceOutput === 'object' && sourceOutput !== null && conn.sourceHandle) {
+          if (Object.prototype.hasOwnProperty.call(sourceOutput, conn.sourceHandle)) {
+            valueToAssign = sourceOutput[conn.sourceHandle];
+            this.addLog('debug', `Extracting value from complex object via sourceHandle '${conn.sourceHandle}'`, node.id);
+          } else {
+            // Fallback for cases where sourceHandle does not match a key
+            valueToAssign = sourceOutput;
+            this.addLog('warn', `sourceHandle '${conn.sourceHandle}' not found in source output. Passing entire object.`, node.id, { sourceOutput });
+          }
         } else {
+          // For primitive values or when sourceHandle is not available
           valueToAssign = sourceOutput;
         }
 
