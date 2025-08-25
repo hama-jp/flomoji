@@ -102,12 +102,8 @@ const useWorkflowExecution = ({
     const preprocessedNodes = preprocessNodesForExecution();
     console.log('preprocessedNodes:', preprocessedNodes);
     
-    // 実行前のノード状態をクリアしない（ノードを保持）
-    // setNodes(prevNodes => {
-    //   const validNodes = Array.isArray(prevNodes) ? prevNodes : [];
-    //   return preprocessedNodes.length > 0 ? preprocessedNodes.map(n => ({...n})) : validNodes;
-    // });
-    console.log('実行前 - ノード状態を保持します');
+    // 実行前に出力ノードの結果をクリア
+    setNodes(preprocessedNodes.map(n => ({...n})));
 
     const inputNodes = preprocessedNodes.filter(n => n.type === 'input');
     const inputData = Object.fromEntries(inputNodes.map(n => [n.id, n.data.value || '']));
@@ -255,7 +251,7 @@ const useWorkflowExecution = ({
         nodeExecutionService.stopExecution();
       }
     } finally {
-      // processExecutionCompletion();
+      processExecutionCompletion();
       console.log('実行完了 - 2秒後に状態をリセットします');
       
       // 実行完了状態を2秒間表示してからリセット
