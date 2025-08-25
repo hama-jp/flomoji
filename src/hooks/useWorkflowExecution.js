@@ -102,7 +102,8 @@ const useWorkflowExecution = ({
     const preprocessedNodes = preprocessNodesForExecution();
     console.log('preprocessedNodes:', preprocessedNodes);
     
-    setNodes(preprocessedNodes);
+    // 実行前に出力ノードの結果をクリア
+    setNodes(preprocessedNodes.map(n => ({...n})));
 
     const inputNodes = preprocessedNodes.filter(n => n.type === 'input');
     const inputData = Object.fromEntries(inputNodes.map(n => [n.id, n.data.value || '']));
