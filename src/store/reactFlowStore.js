@@ -42,8 +42,14 @@ const useReactFlowStore = create(
         });
       },
 
-      setNodes: (nodes) => {
-        set({ nodes });
+      setNodes: (nodesOrUpdater) => {
+        if (typeof nodesOrUpdater === 'function') {
+          const currentNodes = get().nodes;
+          const newNodes = nodesOrUpdater(currentNodes);
+          set({ nodes: newNodes });
+        } else {
+          set({ nodes: nodesOrUpdater });
+        }
       },
 
       setEdges: (edges) => {

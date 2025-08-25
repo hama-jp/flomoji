@@ -27,52 +27,6 @@ const useWorkflowExecution = ({
     });
   }, [nodes]);
 
-  const processExecutionCompletion = useCallback(() => {
-    const finalContext = nodeExecutionService.executionContext;
-    const executionLog = nodeExecutionService.getExecutionLog();
-    let newSelectedNode = null;
-
-    setNodes(prevNodes => {
-      console.log('processExecutionCompletion - prevNodes:', prevNodes);
-      const validNodes = Array.isArray(prevNodes) ? prevNodes : [];
-      const newNodes = validNodes.map(node => {
-        // Output ノードの結果を更新
-        if (node.type === 'output' && finalContext[node.id] !== undefined) {
-          const updatedNode = { ...node, data: { ...node.data, result: String(finalContext[node.id]) } };
-          if (selectedNode && selectedNode.id === node.id) newSelectedNode = updatedNode;
-          return updatedNode;
-        }
-        
-        // LLM ノードのプロンプト情報を更新
-        if (node.type === 'llm') {
-          // 実行ログからLLMノードのプロンプト情報を取得
-          const llmLogEntry = executionLog.find(log => 
-            log.nodeId === node.id && 
-            log.message.includes('LLMに送信するプロンプト') && 
-            log.data && log.data.prompt
-          );
-          
-          if (llmLogEntry) {
-            const updatedNode = { 
-              ...node, 
-              data: { 
-                ...node.data, 
-                currentPrompt: llmLogEntry.data.prompt 
-              } 
-            };
-            if (selectedNode && selectedNode.id === node.id) newSelectedNode = updatedNode;
-            return updatedNode;
-          }
-        }
-        
-        return node;
-      });
-      return newNodes;
-    });
-
-    if (newSelectedNode) onSelectedNodeChange(newSelectedNode);
-    setDebugLog(executionLog);
-  }, [selectedNode, onSelectedNodeChange, setNodes, setDebugLog]);
 
   const convertConnectionsFormat = useCallback(() => {
     // React FlowのエッジデータをnodeExecutionServiceが期待する形式に変換
@@ -90,24 +44,17 @@ const useWorkflowExecution = ({
   }, [connections]);
 
   const handleRunAll = useCallback(async () => {
-    console.log('実行開始 - 現在のnodes:', nodes);
-    if (nodes.length === 0) return alert('実行するノードがありません');
+    if (nodes.length === 0) {
+      setExecutionResult({ success: false, error: '実行するノードがありません' });
+      return;
+    }
 
     // 実行前に強制的に状態をリセット
     if (nodeExecutionService.isRunning()) {
-      console.log('前回の実行が残っています。強制的にリセットします。');
       nodeExecutionService.stopExecution();
     }
 
     const preprocessedNodes = preprocessNodesForExecution();
-    console.log('preprocessedNodes:', preprocessedNodes);
-    
-    // 実行前のノード状態をクリアしない（ノードを保持）
-    // setNodes(prevNodes => {
-    //   const validNodes = Array.isArray(prevNodes) ? prevNodes : [];
-    //   return preprocessedNodes.length > 0 ? preprocessedNodes.map(n => ({...n})) : validNodes;
-    // });
-    console.log('実行前 - ノード状態を保持します');
 
     const inputNodes = preprocessedNodes.filter(n => n.type === 'input');
     const inputData = Object.fromEntries(inputNodes.map(n => [n.id, n.data.value || '']));
@@ -116,7 +63,6 @@ const useWorkflowExecution = ({
 
     setExecutor(exec);
     const initialState = { running: true, currentNodeId: null, executedNodeIds: new Set() };
-    console.log('Setting initial execution state:', initialState);
     setExecutionState(initialState);
     setDebugLog([]);
     nodeExecutionService.setDebugMode(true);
@@ -133,14 +79,6 @@ const useWorkflowExecution = ({
               currentNodeId: result.value.currentNodeId, 
               executedNodeIds: new Set(prev.executedNodeIds)
             };
-            console.log('=== EXECUTION STATE UPDATE ===');
-            console.log('Setting current executing node:', JSON.stringify(newState, (key, value) => 
-              value instanceof Set ? Array.from(value) : value, 2));
-            console.log('result:', JSON.stringify(result, null, 2));
-            console.log('result.value:', JSON.stringify(result.value, null, 2));
-            console.log('currentNodeId type:', typeof result.value?.currentNodeId, 'value:', result.value?.currentNodeId);
-            console.log('Available nodes:', nodes.map(n => ({ id: n.id, type: typeof n.id })));
-            console.log('========================');
             return newState;
           });
           
@@ -156,14 +94,12 @@ const useWorkflowExecution = ({
               currentNodeId: null, // 実行完了後はnullに
               executedNodeIds: newExecutedIds 
             };
-            console.log('Node execution completed:', newState);
             return newState;
           });
         }
       } while (!result.done);
       const finalState = result.value;
       if (finalState.status === 'completed') {
-        console.log('実行完了 - finalState:', finalState);
         const outputResults = {};
         const outputNodes = preprocessedNodes.filter(n => n.type === 'output');
         outputNodes.forEach(node => {
@@ -198,15 +134,19 @@ const useWorkflowExecution = ({
           outputs: outputResults
         });
         
-        // Outputノードの結果を更新しない（ノードが消えるのを防ぐ）
-        // 実行結果はoutputResultsで確認できる
-        outputNodes.forEach(node => {
-          if (nodeExecutionService.executionContext[node.id] !== undefined) {
-            console.log(`Outputノード ${node.id} の結果:`, nodeExecutionService.executionContext[node.id]);
-          }
+        // Outputノードの結果を更新
+        setNodes(prevNodes => {
+          const validNodes = Array.isArray(prevNodes) ? prevNodes : [];
+          return validNodes.map(node => {
+            // Outputノードの結果を更新
+            if (node.type === 'output' && nodeExecutionService.executionContext[node.id] !== undefined) {
+              const updatedNode = { ...node, data: { ...node.data, result: String(nodeExecutionService.executionContext[node.id]) } };
+              return updatedNode;
+            }
+            return node;
+          });
         });
       } else {
-        console.log('実行失敗:', finalState.error);
         
         // エラー時のログを追加
         const executionLog = nodeExecutionService.getExecutionLog();
@@ -255,24 +195,21 @@ const useWorkflowExecution = ({
         nodeExecutionService.stopExecution();
       }
     } finally {
-      // processExecutionCompletion();
-      console.log('実行完了 - 2秒後に状態をリセットします');
       
       // 実行完了状態を2秒間表示してからリセット
       setTimeout(() => {
-        console.log('状態をリセット中...');
         setExecutionState({ running: false, currentNodeId: null, executedNodeIds: new Set() });
         setExecutor(null);
       }, 2000);
     }
-  }, [nodes, connections, nodeTypes, preprocessNodesForExecution, setNodes, setExecutor, setExecutionState, setDebugLog, setExecutionResult, processExecutionCompletion, convertConnectionsFormat]);
+  }, [nodes, connections, nodeTypes, preprocessNodesForExecution, setNodes, setExecutor, setExecutionState, setDebugLog, setExecutionResult, convertConnectionsFormat]);
 
   const handleStepForward = useCallback(async () => {
     let currentExecutor = executor;
     try {
       if (!currentExecutor) {
         const preprocessedNodes = preprocessNodesForExecution();
-        setNodes(preprocessedNodes.map(n => ({...n})));
+        // ノードの状態はそのまま保持し、結果のみクリア済み（preprocessNodesForExecutionで処理済み）
 
         const inputNodes = preprocessedNodes.filter(n => n.type === 'input');
         const inputData = Object.fromEntries(inputNodes.map(n => [n.id, n.data.value || '']));
@@ -280,13 +217,19 @@ const useWorkflowExecution = ({
         currentExecutor = await nodeExecutionService.startExecution(preprocessedNodes, convertedConnections, inputData);
         setExecutor(currentExecutor);
         setExecutionState({ running: true, currentNodeId: null, executedNodeIds: new Set() });
-        alert("ステップ実行を開始します。もう一度「ステップ」を押して最初のノードを実行してください。");
+        // ステップ実行開始をログに記録
+        setDebugLog([{
+          timestamp: new Date().toISOString(),
+          level: 'info',
+          message: 'ステップ実行を開始します。もう一度「ステップ」を押して最初のノードを実行してください。',
+          nodeId: null,
+          data: {}
+        }]);
         return;
       }
       const result = await currentExecutor.next();
       if (result.done) {
         if (result.value.status === 'completed') {
-          alert('ワークフローの実行が完了しました。');
           const outputResults = {};
           const outputNodes = nodes.filter(n => n.type === 'output');
           outputNodes.forEach(node => {
@@ -300,7 +243,6 @@ const useWorkflowExecution = ({
             outputs: outputResults
           });
         } else if (result.value.status === 'error') {
-          alert(`エラーが発生しました: ${result.value.error?.message}`);
           setExecutionResult({ success: false, error: result.value.error?.message });
         }
         // Process execution completion directly to avoid circular dependency
@@ -351,14 +293,6 @@ const useWorkflowExecution = ({
         if (executor) executor.stop();
         setExecutor(null);
         setExecutionState({ running: false, currentNodeId: null, executedNodeIds: new Set() });
-        setExecutionResult(null);
-        
-        // Clear output node results
-        setNodes(prev => prev.map(node => 
-          node.type === 'output' 
-            ? { ...node, data: { ...node.data, result: '' } }
-            : node
-        ));
       } else {
         setExecutionState(prev => {
           const newExecutedIds = new Set(prev.executedNodeIds);
