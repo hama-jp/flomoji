@@ -252,14 +252,8 @@ const useWorkflowExecution = ({
       }
     } finally {
       processExecutionCompletion();
-      console.log('実行完了 - 2秒後に状態をリセットします');
-      
-      // 実行完了状態を2秒間表示してからリセット
-      setTimeout(() => {
-        console.log('状態をリセット中...');
-        setExecutionState({ running: false, currentNodeId: null, executedNodeIds: new Set() });
-        setExecutor(null);
-      }, 2000);
+      console.log('実行完了');
+      // 実行状態は次回の実行開始時まで保持
     }
   }, [nodes, connections, nodeTypes, preprocessNodesForExecution, setNodes, setExecutor, setExecutionState, setDebugLog, setExecutionResult, processExecutionCompletion, convertConnectionsFormat]);
 
