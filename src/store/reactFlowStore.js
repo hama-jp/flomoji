@@ -76,6 +76,19 @@ const useReactFlowStore = create(
         });
       },
 
+      deleteSelectedElements: () => {
+        const { nodes, edges } = get();
+        const selectedNodes = nodes.filter(n => n.selected);
+        const selectedEdges = edges.filter(e => e.selected);
+
+        const selectedNodeIds = selectedNodes.map(n => n.id);
+
+        const remainingNodes = nodes.filter(n => !n.selected);
+        const remainingEdges = edges.filter(e => !e.selected && !selectedNodeIds.includes(e.source) && !selectedNodeIds.includes(e.target));
+
+        set({ nodes: remainingNodes, edges: remainingEdges });
+      },
+
       setViewport: (viewport) => {
         set({ viewport });
       },
