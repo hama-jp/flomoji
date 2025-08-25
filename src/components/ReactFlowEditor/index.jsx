@@ -503,6 +503,7 @@ const ReactFlowEditor = ({ selectedNode, onSelectedNodeChange, onEditingNodeChan
       // 画面座標とReactFlow座標の両方を保存
       const flowPosition = screenToFlowPosition({ x: event.clientX, y: event.clientY });
       setContextMenu({ 
+        type: 'pane',
         screenX: event.clientX, 
         screenY: event.clientY,
         flowX: flowPosition.x,
@@ -511,6 +512,16 @@ const ReactFlowEditor = ({ selectedNode, onSelectedNodeChange, onEditingNodeChan
     },
     [screenToFlowPosition, setContextMenu]
   );
+
+  const onSelectionContextMenu = useCallback((event, elements) => {
+    event.preventDefault();
+    setContextMenu({
+      type: 'selection',
+      screenX: event.clientX,
+      screenY: event.clientY,
+      elements,
+    });
+  }, [setContextMenu]);
 
   // ドラッグオーバー時の処理
   const onDragOver = useCallback((event) => {
@@ -629,6 +640,8 @@ const ReactFlowEditor = ({ selectedNode, onSelectedNodeChange, onEditingNodeChan
         onNodeClick={onNodeClick}
         onPaneClick={onPaneClick}
         onPaneContextMenu={onPaneContextMenu}
+        onNodeContextMenu={onSelectionContextMenu}
+        onEdgeContextMenu={onSelectionContextMenu}
         onDragOver={onDragOver}
         onDrop={onDrop}
         defaultViewport={{ x: 0, y: 0, zoom: 1 }}

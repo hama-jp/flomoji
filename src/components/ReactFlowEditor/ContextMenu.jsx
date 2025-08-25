@@ -2,12 +2,13 @@ import React, { useState } from 'react';
 import { useStore as useUIStore } from '../../store';
 import useReactFlowStore from '../../store/reactFlowStore';
 import { nodesByCategory } from '../nodes/index.js';
-import { ChevronRight, ChevronDown, Plus } from 'lucide-react';
+import { ChevronRight, ChevronDown, Plus, Trash2 } from 'lucide-react';
 
 const ContextMenu = () => {
   const contextMenu = useUIStore(state => state.contextMenu);
   const setContextMenu = useUIStore(state => state.setContextMenu);
   const addNode = useReactFlowStore(state => state.addNode);
+  const deleteSelectedElements = useReactFlowStore(state => state.deleteSelectedElements);
   const [expandedCategories, setExpandedCategories] = useState({});
 
   if (!contextMenu) {
@@ -35,6 +36,11 @@ const ContextMenu = () => {
     setContextMenu(null);
   };
 
+  const handleDelete = () => {
+    deleteSelectedElements();
+    setContextMenu(null);
+  };
+
   const toggleCategory = (categoryKey) => {
     setExpandedCategories(prev => ({
       ...prev,
@@ -42,18 +48,8 @@ const ContextMenu = () => {
     }));
   };
 
-  return (
-    <div
-      style={{
-        position: 'absolute',
-        left: contextMenu.screenX || contextMenu.x,
-        top: contextMenu.screenY || contextMenu.y,
-        zIndex: 1000,
-      }}
-      className="bg-white rounded-lg shadow-lg border py-2 min-w-56 max-h-[32rem] overflow-y-auto"
-      onClick={(e) => e.stopPropagation()}
-      onContextMenu={(e) => e.preventDefault()}
-    >
+  const renderAddNodeMenu = () => (
+    <>
       {/* Header */}
       <div className="px-3 py-2 text-sm font-semibold text-gray-700 border-b mb-1 flex items-center">
         <Plus className="w-4 h-4 mr-2" />
@@ -154,6 +150,34 @@ const ContextMenu = () => {
           </div>
         );
       })}
+    </>
+  );
+
+  const renderSelectionMenu = () => (
+    <>
+      <button
+        onClick={handleDelete}
+        className="w-full text-left px-3 py-2 hover:bg-red-50 text-red-700 flex items-center space-x-2 transition-colors"
+      >
+        <Trash2 className="w-4 h-4" />
+        <span>Delete Selection</span>
+      </button>
+    </>
+  );
+
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        left: contextMenu.screenX || contextMenu.x,
+        top: contextMenu.screenY || contextMenu.y,
+        zIndex: 1000,
+      }}
+      className="bg-white rounded-lg shadow-lg border py-2 min-w-56 max-h-[32rem] overflow-y-auto"
+      onClick={(e) => e.stopPropagation()}
+      onContextMenu={(e) => e.preventDefault()}
+    >
+      {contextMenu.type === 'selection' ? renderSelectionMenu() : renderAddNodeMenu()}
     </div>
   );
 };
