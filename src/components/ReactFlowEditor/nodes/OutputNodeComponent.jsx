@@ -3,13 +3,11 @@ import CustomNode from './CustomNode';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Download } from 'lucide-react';
-import nodeExecutionService from '../../../services/nodeExecutionService';
 
 const OutputNodeComponent = ({ id, data }) => {
   
-  // 実行コンテキストから結果を取得
-  const contextResult = nodeExecutionService.executionContext[id];
-  const displayResult = contextResult || data.result || 'No result yet...';
+  // propsのdata.resultを使用（実行結果はuseWorkflowExecutionで更新される）
+  const displayResult = data.result || 'No result yet...';
   
   // ファイルダウンロード処理
   const handleDownload = () => {
