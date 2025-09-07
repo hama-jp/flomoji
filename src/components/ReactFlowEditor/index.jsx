@@ -20,6 +20,7 @@ import TimestampNodeComponent from './nodes/TimestampNodeComponent';
 import HTTPRequestNodeComponent from './nodes/HTTPRequestNodeComponent';
 import WebSearchNodeComponent from './nodes/WebSearchNodeComponent';
 import CodeExecutionNodeComponent from './nodes/CodeExecutionNodeComponent';
+import WebAPINodeComponent from './nodes/WebAPINodeComponent';
 import CustomNode from './nodes/CustomNode';
 import CustomEdge from './edges/CustomEdge';
 import ContextMenu from './ContextMenu';
@@ -65,6 +66,7 @@ const nodeTypes = {
   http_request: HTTPRequestNodeComponent,
   web_search: WebSearchNodeComponent,
   code_execution: CodeExecutionNodeComponent,
+  web_api: WebAPINodeComponent,
   // 他の未実装ノードタイプはCustomNodeで処理
 };
 
