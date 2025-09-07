@@ -16,6 +16,7 @@ import TimestampNode from './TimestampNode.js';
 import HTTPRequestNode from './HTTPRequestNode.js';
 import WebSearchNode from './WebSearchNode.js';
 import CodeExecutionNode from './CodeExecutionNode.js';
+import WebAPINode from './WebAPINode.js';
 
 /**
  * 全てのノードタイプの定義を統合
@@ -33,7 +34,8 @@ export const nodeTypes = {
   timestamp: TimestampNode,
   http_request: HTTPRequestNode,
   web_search: WebSearchNode,
-  code_execution: CodeExecutionNode
+  code_execution: CodeExecutionNode,
+  web_api: WebAPINode
 };
 
 /**
@@ -80,7 +82,8 @@ export const nodesByCategory = {
     name: 'Web Integration',
     nodes: {
       http_request: HTTPRequestNode,
-      web_search: WebSearchNode
+      web_search: WebSearchNode,
+      web_api: WebAPINode
     }
   }
 };;
@@ -99,7 +102,8 @@ export const nodeTypesList = [
   'variable_set',
   'schedule',
   'http_request',
-  'web_search'
+  'web_search',
+  'web_api'
 ];
 
 export default nodeTypes;

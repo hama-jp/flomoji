@@ -14,7 +14,7 @@ flomojiは、複雑な環境構築なしにAIとの対話やワークフロー�
 - 💬 **AI Chat**: Real-time conversations with AI, with chat history management.
 - 🔗 **Workflows**: Automate tasks using prompt chaining.
 - ⚙️ **JavaScript Code Execution**: Secure in-browser JavaScript processing with Web Worker isolation and built-in templates.
-- 🌐 **Web Integration**: HTTP requests and web search capabilities for dynamic data processing.
+- 🌐 **Web Integration**: HTTP requests, web search, and Web API connector for dynamic data processing.
 - ⏰ **Scheduled Workflows**: Automate workflows with cron-based scheduling.
 - 🎨 **Enhanced Node UI**: Color-coded handles and toggleable labels for better visual clarity.
 - 🔌 **Multi-LLM Support**: Works with OpenAI, Anthropic, and local LLMs.
