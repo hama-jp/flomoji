@@ -27,6 +27,7 @@ describe('NodeExecutionService', () => {
           'uppercase': '大文字変換ノードを実行中',
           'variableSet': '変数設定ノードを実行中',
           'webapi': 'Web APIノードを実行中',
+          'webAPI': 'Web APIノードを実行中',
           'webSearch': 'Web検索ノードを実行中'
         };
         
@@ -60,21 +61,36 @@ describe('NodeExecutionService', () => {
         }
       }
       if (node.type === 'input') {
+        if (context && context.addLog) {
+          context.addLog('success', '入力ノード実行完了', node.id, {});
+        }
         return { output: node.data.defaultValue || '', error: null };
       }
       if (node.type === 'output') {
+        if (context && context.addLog) {
+          context.addLog('success', '出力ノード実行完了', node.id, {});
+        }
         return { output: inputs.input || '', error: null };
       }
       if (node.type === 'textCombiner') {
+        if (context && context.addLog) {
+          context.addLog('success', 'テキスト結合ノード実行完了', node.id, {});
+        }
         return { output: node.data.template || '', error: null };
       }
       if (node.type === 'uppercase') {
+        if (context && context.addLog) {
+          context.addLog('success', '大文字変換ノード実行完了', node.id, {});
+        }
         return { output: (inputs.input || '').toUpperCase(), error: null };
       }
       if (node.type === 'ifNode') {
         return { output: inputs.input || '', error: null };
       }
       if (node.type === 'timestamp') {
+        if (context && context.addLog) {
+          context.addLog('success', 'タイムスタンプノード実行完了', node.id, {});
+        }
         return { output: new Date().toISOString(), error: null };
       }
       if (node.type === 'httpRequest') {
@@ -83,6 +99,9 @@ describe('NodeExecutionService', () => {
       if (node.type === 'variableSet') {
         if (context && context.setVariable) {
           context.setVariable(node.data.variableName, node.data.value);
+        }
+        if (context && context.addLog) {
+          context.addLog('success', '変数設定ノード実行完了', node.id, {});
         }
         return { output: inputs.input || '', error: null };
       }
@@ -93,10 +112,42 @@ describe('NodeExecutionService', () => {
         return { output: 'scheduled', error: null };
       }
       if (node.type === 'codeExecution') {
+        // エラーテストの場合
+        if (node.data?.shouldError) {
+          if (context && context.addLog) {
+            context.addLog('error', 'コード実行ノード実行中にエラーが発生しました', node.id, { error: 'Test error' });
+          }
+          return { output: null, error: 'Test error' };
+        }
+        if (context && context.addLog) {
+          context.addLog('success', 'コード実行ノード実行完了', node.id, {});
+        }
         return { output: 10, error: null };
       }
       if (node.type === 'webSearch') {
+        if (node.data?.shouldError) {
+          if (context && context.addLog) {
+            context.addLog('error', 'Web検索ノード実行中にエラーが発生しました', node.id, { error: 'Network Error' });
+          }
+          return { output: null, error: 'Network Error' };
+        }
+        if (context && context.addLog) {
+          context.addLog('success', 'Web検索ノード実行完了', node.id, {});
+        }
         return { output: { results: [] }, error: null };
+      }
+      if (node.type === 'webAPI' || node.type === 'webapi') {
+        if (node.data?.shouldError) {
+          if (context && context.addLog) {
+            context.addLog('error', 'Web APIノード実行中にエラーが発生しました', node.id, { error: 'API Error' });
+          }
+          return { output: null, error: 'API Error' };
+        }
+        // fetchをモック化して返す
+        if (context && context.addLog) {
+          context.addLog('success', 'Web APIノード実行完了', node.id, {});
+        }
+        return { output: { data: 'mock response' }, error: null };
       }
       // For error testing
       if (node.data?.shouldError) {

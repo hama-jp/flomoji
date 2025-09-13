@@ -24,6 +24,18 @@ Object.defineProperty(window, 'localStorage', {
 describe('workflowManagerService', () => {
   beforeEach(() => {
     localStorageMock.clear();
+    
+    // fetchをモック化
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        name: 'Sample Workflow',
+        nodes: [],
+        edges: []
+      })
+    });
+    vi.stubGlobal('fetch', mockFetch);
+    
     // StorageServiceをモック化し、getWorkflowsが空を返すように設定
     vi.spyOn(StorageService, 'getWorkflows').mockReturnValue({});
     vi.spyOn(StorageService, 'setWorkflows').mockImplementation(() => true);
@@ -33,12 +45,10 @@ describe('workflowManagerService', () => {
     vi.spyOn(StorageService, 'getCurrentWorkflowId').mockReturnValue(null);
     vi.spyOn(StorageService, 'setCurrentWorkflowId').mockImplementation(() => true);
 
-        // workflowManagerServiceのインスタンスをリセット
-    // シングルトンなので、テストごとに状態をリセットする
-    // (workflowManagerService as any).__proto__ = new (require('./workflowManagerService').default.constructor)();
-    // 上記の行は削除し、代わりにStorageServiceのモックをクリアすることで状態をリセットする
-    (workflowManagerService as any).reset(); // 追加
-    // 上記の行は削除し、代わりにStorageServiceのモックをクリアすることで状態をリセットする
+    // workflowManagerServiceの内部状態をリセット
+    // プライベートプロパティに直接アクセスして初期化
+    (workflowManagerService as any).workflows = {};
+    (workflowManagerService as any).currentWorkflowId = null;
   });
 
   it('should initialize with sample workflows when none exist', async () => {
