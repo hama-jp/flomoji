@@ -69,7 +69,8 @@ describe('TimestampNode', () => {
     // 結果が文字列で、日付らしい形式であることを確認
     expect(typeof result).toBe('string');
     expect(result.length).toBeGreaterThan(0);
-    expect(context.setVariable).toHaveBeenCalledWith('timestamp-1', result);
+    // 変数が直接設定されていることを確認
+    expect(context.variables['timestamp-1']).toBe(result);
   });
 
   it('should execute correctly with ISO format', async () => {
@@ -94,7 +95,7 @@ describe('TimestampNode', () => {
 
     // ISO形式の結果を確認（YYYY-MM-DDTHH:mm:ss.sssZのパターン）
     expect(result as any).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
-    expect(context.setVariable).toHaveBeenCalledWith('timestamp-2', result);
+    expect(context.variables['timestamp-2']).toBe(result);
   });
 
   it('should execute correctly with Unix timestamp format', async () => {
@@ -120,7 +121,7 @@ describe('TimestampNode', () => {
     // Unix timestampは数字のみの文字列
     expect(result as any).toMatch(/^\d+$/);
     expect(parseInt(result)).toBeGreaterThan(1000000000); // 2001年以降
-    expect(context.setVariable).toHaveBeenCalledWith('timestamp-3', result);
+    expect(context.variables['timestamp-3']).toBe(result);
   });
 
   it('should execute correctly with date-only format', async () => {
@@ -145,7 +146,7 @@ describe('TimestampNode', () => {
 
     // 日付形式（YYYY/MM/DD）の確認
     expect(result as any).toMatch(/^\d{4}\/\d{2}\/\d{2}$/);
-    expect(context.setVariable).toHaveBeenCalledWith('timestamp-4', result);
+    expect(context.variables['timestamp-4']).toBe(result);
   });
 
   it('should execute correctly with time-only format', async () => {
@@ -170,7 +171,7 @@ describe('TimestampNode', () => {
 
     // 時刻形式（HH:mm:ss）の確認
     expect(result as any).toMatch(/^\d{2}:\d{2}:\d{2}$/);
-    expect(context.setVariable).toHaveBeenCalledWith('timestamp-5', result);
+    expect(context.variables['timestamp-5']).toBe(result);
   });
 
   it('should handle invalid timezone gracefully', async () => {
@@ -196,7 +197,7 @@ describe('TimestampNode', () => {
     // エラーが発生してもフォールバック値が返される
     expect(typeof result).toBe('string');
     expect(result.length).toBeGreaterThan(0);
-    expect(context.setVariable).toHaveBeenCalledWith('timestamp-error', result);
+    expect(context.variables['timestamp-error']).toBe(result);
     
     // エラーログが記録される
     expect(context.addLog).toHaveBeenCalledWith(
