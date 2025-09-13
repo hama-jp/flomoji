@@ -1,9 +1,12 @@
-import React, { useCallback, useEffect, useState, useMemo, SetStateAction } from 'react';
+import React, { useCallback, useEffect, useState, useMemo, useRef, SetStateAction } from 'react';
 
 import { ReactFlow, Background, Controls, MiniMap, useReactFlow, Viewport } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import './ReactFlowEditor.css';
 
+import { toast } from 'sonner';
+
+import useKeyboardShortcuts, { COMMON_SHORTCUTS } from '../../hooks/useKeyboardShortcuts';
 import useWorkflowExecution from '../../hooks/useWorkflowExecution';
 import { debounce } from '../../lib/utils';
 import schedulerService from '../../services/schedulerService';
@@ -53,6 +56,11 @@ const selectSetEdges = (state: ReactFlowStoreState) => state.setEdges;
 const selectAddNode = (state: ReactFlowStoreState) => state.addNode;
 const selectSetViewport = (state: ReactFlowStoreState) => state.setViewport;
 const selectLoadWorkflow = (state: ReactFlowStoreState) => state.loadWorkflow;
+const selectUndo = (state: ReactFlowStoreState) => state.undo;
+const selectRedo = (state: ReactFlowStoreState) => state.redo;
+const selectCanUndo = (state: ReactFlowStoreState) => state.canUndo;
+const selectCanRedo = (state: ReactFlowStoreState) => state.canRedo;
+const selectDeleteSelectedElements = (state: ReactFlowStoreState) => state.deleteSelectedElements;
 
 const selectExecutor = (state: ExecutionStore) => state.executor;
 const selectSetExecutor = (state: ExecutionStore) => state.setExecutor;
@@ -60,30 +68,29 @@ const selectSetExecutionState = (state: ExecutionStore) => state.setExecutionSta
 const selectSetExecutionResult = (state: ExecutionStore) => state.setExecutionResult;
 const selectSetDebugLog = (state: ExecutionStore) => state.setDebugLog;
 
-const nodeTypes = {
-  input: InputNodeComponent,
-  output: OutputNodeComponent,
-  timestamp: TimestampNodeComponent,
-  llm: LLMNodeComponent,
-  if: IfNodeComponent,
-  while: WhileNodeComponent,
-  text: TextNodeComponent,
-  text_combiner: TextCombinerNodeComponent,
-  variable_set: VariableSetNodeComponent,
-  schedule: ScheduleNodeComponent,
-  http_request: HTTPRequestNodeComponent,
-  web_search: WebSearchNodeComponent,
-  code_execution: CodeExecutionNodeComponent,
-  web_api: WebAPINodeComponent,
-  // 他の未実装ノードタイプはCustomNodeで処理
-};
-
-const edgeTypes = {
-  custom: CustomEdge,
-};
-
-
 const ReactFlowEditor = ({ selectedNode, onSelectedNodeChange, onEditingNodeChange }: any) => {
+  // nodeTypesとedgeTypesをメモ化して再生成を防ぐ
+  const nodeTypes = useMemo(() => ({
+    input: InputNodeComponent,
+    output: OutputNodeComponent,
+    timestamp: TimestampNodeComponent,
+    llm: LLMNodeComponent,
+    if: IfNodeComponent,
+    while: WhileNodeComponent,
+    text: TextNodeComponent,
+    text_combiner: TextCombinerNodeComponent,
+    variable_set: VariableSetNodeComponent,
+    schedule: ScheduleNodeComponent,
+    http_request: HTTPRequestNodeComponent,
+    web_search: WebSearchNodeComponent,
+    code_execution: CodeExecutionNodeComponent,
+    web_api: WebAPINodeComponent,
+    // 他の未実装ノードタイプはCustomNodeで処理
+  }), []); // 空の依存配列（静的な定義）
+
+  const edgeTypes = useMemo(() => ({
+    custom: CustomEdge,
+  }), []); // 空の依存配列（静的な定義）
   // 個別のセレクターを使用してZustandストアから値を取得
   const rawNodes = useReactFlowStore(selectNodes);
   const rawEdges = useReactFlowStore(selectEdges);
@@ -110,6 +117,11 @@ const ReactFlowEditor = ({ selectedNode, onSelectedNodeChange, onEditingNodeChan
   const addNode = useReactFlowStore(selectAddNode);
   const setViewport = useReactFlowStore(selectSetViewport);
   const loadWorkflow = useReactFlowStore(selectLoadWorkflow);
+  const undo = useReactFlowStore(selectUndo);
+  const redo = useReactFlowStore(selectRedo);
+  const canUndo = useReactFlowStore(selectCanUndo);
+  const canRedo = useReactFlowStore(selectCanRedo);
+  const deleteSelectedElements = useReactFlowStore(selectDeleteSelectedElements);
 
   const executor = useExecutionStore(selectExecutor) as Executor | null;
   const executionState = useExecutionStore((state: { executionState: ExecutionState }) => state.executionState);
@@ -128,6 +140,29 @@ const ReactFlowEditor = ({ selectedNode, onSelectedNodeChange, onEditingNodeChan
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showHandleLabels, setShowHandleLabels] = useState(true);
+
+  // useRefで安定した参照を作成（Phase 3最適化）
+  const nodesRef = useRef(nodes);
+  const edgesRef = useRef(edges);
+  const currentWorkflowRef = useRef(currentWorkflow);
+  const viewportRef = useRef(viewport);
+
+  // Refを更新
+  useEffect(() => {
+    nodesRef.current = nodes;
+  }, [nodes]);
+
+  useEffect(() => {
+    edgesRef.current = edges;
+  }, [edges]);
+
+  useEffect(() => {
+    currentWorkflowRef.current = currentWorkflow;
+  }, [currentWorkflow]);
+
+  useEffect(() => {
+    viewportRef.current = viewport;
+  }, [viewport]);
 
   // Initial load effect
   useEffect(() => {
@@ -200,34 +235,35 @@ const ReactFlowEditor = ({ selectedNode, onSelectedNodeChange, onEditingNodeChan
     }
   }, [nodes, edges, viewport, currentWorkflow, debouncedSave]);
 
-  // Workflow management handlers
+  // Workflow management handlers（Phase 3: 依存配列を最適化）
   const handleWorkflowSave = useCallback(() => {
-    if (currentWorkflow) {
+    const current = currentWorkflowRef.current;
+    if (current) {
       const workflowToSave = {
-        ...(currentWorkflow as Workflow),
-        flow: { 
-          nodes: nodes || [], 
-          edges: edges || [], 
-          viewport: viewport || { x: 0, y: 0, zoom: 1 }
+        ...(current as Workflow),
+        flow: {
+          nodes: nodesRef.current || [],
+          edges: edgesRef.current || [],
+          viewport: viewportRef.current || { x: 0, y: 0, zoom: 1 }
         },
         lastModified: new Date().toISOString()
       };
-      
+
       console.log('Manual save:', workflowToSave.name, {
-        nodes: nodes?.length || 0,
-        edges: edges?.length || 0,
+        nodes: nodesRef.current?.length || 0,
+        edges: edgesRef.current?.length || 0,
         viewport: workflowToSave.flow.viewport
       });
-      
+
       workflowManagerService.saveWorkflow(workflowToSave);
       setCurrentWorkflow(workflowToSave); // 最新状態で更新
       setHasUnsavedChanges(false);
-      
+
       // workflows listも更新
       const workflowsData = workflowManagerService.getWorkflows();
       setWorkflows(Object.values(workflowsData));
     }
-  }, [currentWorkflow, nodes, edges, viewport]);
+  }, []); // 依存配列が空に！
 
   const handleWorkflowLoad = useCallback((workflowId: string) => {
     const workflow = workflowManagerService.getWorkflow(workflowId);
@@ -307,23 +343,24 @@ const ReactFlowEditor = ({ selectedNode, onSelectedNodeChange, onEditingNodeChan
   }, [handleWorkflowLoad]);
 
   const handleWorkflowExport = useCallback(() => {
-    if (currentWorkflow) {
+    const current = currentWorkflowRef.current;
+    if (current) {
       // Export with current flow state
       const exportWorkflow = {
-        ...(currentWorkflow as Workflow),
-        flow: { 
-          nodes: nodes || [], 
-          edges: edges || [], 
-          viewport: viewport || { x: 0, y: 0, zoom: 1 }
+        ...(current as Workflow),
+        flow: {
+          nodes: nodesRef.current || [],
+          edges: edgesRef.current || [],
+          viewport: viewportRef.current || { x: 0, y: 0, zoom: 1 }
         },
         lastModified: new Date().toISOString()
       };
-      
+
       console.log('Exporting workflow:', exportWorkflow.name, {
         nodes: exportWorkflow.flow.nodes.length,
         edges: exportWorkflow.flow.edges.length
       });
-      
+
       const dataStr = JSON.stringify(exportWorkflow, null, 2);
       const dataBlob = new Blob([dataStr], { type: 'application/json' });
       const url = URL.createObjectURL(dataBlob);
@@ -333,7 +370,7 @@ const ReactFlowEditor = ({ selectedNode, onSelectedNodeChange, onEditingNodeChan
       link.click();
       URL.revokeObjectURL(url);
     }
-  }, [currentWorkflow, nodes, edges, viewport]);
+  }, []); // Phase 3: 依存配列を削減
 
   const handleWorkflowImport = useCallback((file: File) => {
     if (!file) {
@@ -448,6 +485,88 @@ const ReactFlowEditor = ({ selectedNode, onSelectedNodeChange, onEditingNodeChan
     executor,
   });
 
+  // キーボードショートカットの設定
+  useKeyboardShortcuts([
+    {
+      keys: [...COMMON_SHORTCUTS.UNDO],
+      handler: () => {
+        if (canUndo()) {
+          undo();
+          toast.info('元に戻しました');
+        }
+      },
+      description: 'Undo last action'
+    },
+    {
+      keys: [...COMMON_SHORTCUTS.REDO],
+      handler: () => {
+        if (canRedo()) {
+          redo();
+          toast.info('やり直しました');
+        }
+      },
+      description: 'Redo last action'
+    },
+    {
+      keys: [...COMMON_SHORTCUTS.SAVE],
+      handler: () => {
+        handleWorkflowSave();
+        toast.success('ワークフローを保存しました');
+      },
+      description: 'Save workflow'
+    },
+    {
+      keys: [...COMMON_SHORTCUTS.DELETE],
+      handler: () => {
+        const hasSelection = nodes.some((n: any) => n.selected) || edges.some((e: any) => e.selected);
+        if (hasSelection) {
+          deleteSelectedElements();
+          toast.info('選択した要素を削除しました');
+        }
+      },
+      description: 'Delete selected elements'
+    },
+    {
+      keys: [...COMMON_SHORTCUTS.RUN],
+      handler: () => {
+        if (!executionState.running) {
+          handleRunAll();
+        }
+      },
+      description: 'Run workflow'
+    },
+    {
+      keys: [...COMMON_SHORTCUTS.STOP],
+      handler: () => {
+        if (executionState.running) {
+          handleResetExecution();
+        }
+      },
+      description: 'Stop workflow execution'
+    },
+    {
+      keys: [...COMMON_SHORTCUTS.SELECT_ALL],
+      handler: () => {
+        // Select all nodes
+        setNodes((nds: any[]) => nds.map((node: any) => ({ ...node, selected: true })));
+        toast.info('すべてのノードを選択しました');
+      },
+      description: 'Select all nodes'
+    },
+    {
+      keys: [...COMMON_SHORTCUTS.ESCAPE],
+      handler: () => {
+        // Deselect all
+        setNodes((nds: any[]) => nds.map((node: any) => ({ ...node, selected: false })));
+        setEdges((eds: any[]) => eds.map((edge: any) => ({ ...edge, selected: false })));
+        // Close any open modals or menus
+        setContextMenu(null);
+        setEditingNode(null);
+      },
+      description: 'Deselect all / Close dialogs'
+    }
+  ]);
+
   // SchedulerService統合 - ワークフロー実行コールバックを設定
   useEffect(() => {
     const setupSchedulerIntegration = () => {
@@ -478,11 +597,15 @@ const ReactFlowEditor = ({ selectedNode, onSelectedNodeChange, onEditingNodeChan
     setupSchedulerIntegration();
   }, [handleRunAll, handleResetExecution, executor]);
 
+  // スケジュールノードをメモ化してフィルタリング処理を最適化
+  const scheduleNodes = useMemo(() =>
+    nodes.filter(node => node.type === 'schedule'),
+    [nodes]
+  );
+
   // ScheduleNodeがワークフロー内にある場合、スケジュール設定を自動更新
   useEffect(() => {
     if (!currentWorkflow || !nodes.length) return;
-
-    const scheduleNodes = nodes.filter(node => node.type === 'schedule');
     
     scheduleNodes.forEach(scheduleNode => {
       const { cronExpression, scheduleName, enabled, timeoutMinutes }: any = scheduleNode.data;
@@ -544,7 +667,7 @@ const ReactFlowEditor = ({ selectedNode, onSelectedNodeChange, onEditingNodeChan
     event.dataTransfer.dropEffect = 'move';
   }, []);
 
-  // ドロップ時の処理
+  // ドロップ時の処理（Phase 3: nodesへの依存を削除）
   const onDrop = useCallback(
     (event: React.DragEvent) => {
       event.preventDefault();
@@ -552,7 +675,7 @@ const ReactFlowEditor = ({ selectedNode, onSelectedNodeChange, onEditingNodeChan
 
       const nodeType = event.dataTransfer.getData('application/reactflow');
       console.log('📝 ドラッグされたノードタイプ:', nodeType);
-      
+
       // ノードタイプが無効な場合は何もしない
       if (typeof nodeType === 'undefined' || !nodeType || !nodeDefinitions[nodeType]) {
         console.log('❌ 無効なノードタイプ:', nodeType, 'available:', Object.keys(nodeDefinitions));
@@ -569,7 +692,7 @@ const ReactFlowEditor = ({ selectedNode, onSelectedNodeChange, onEditingNodeChan
       // ノード定義を取得
       const nodeDefinition = nodeDefinitions[nodeType];
       console.log('📋 ノード定義:', nodeDefinition);
-      
+
       // 新しいノードを作成
       const newNodeId = `${nodeType}-${Date.now()}`;
       const newNode = {
@@ -584,15 +707,15 @@ const ReactFlowEditor = ({ selectedNode, onSelectedNodeChange, onEditingNodeChan
 
       console.log('✨ Creating new node:', newNode);
 
-      // 現在のノード数を確認
-      const currentNodes = nodes;
+      // 現在のノード数を確認（refから取得）
+      const currentNodes = nodesRef.current;
       console.log('📊 現在のノード数:', currentNodes.length);
 
       // ノードをストアに追加（addNode関数を使用）
       console.log('🔧 Calling addNode with:', newNode);
       addNode(newNode);
     },
-    [screenToFlowPosition, addNode, nodes]
+    [screenToFlowPosition, addNode] // nodesへの依存を削除
   );
 
   // ノードクリック時の選択処理

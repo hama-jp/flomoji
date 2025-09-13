@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 
 import { Textarea } from '@/components/ui/textarea';
 
@@ -65,4 +65,4 @@ const VariableSetNodeComponent = ({ id, data }: any) => {
   );
 };
 
-export default VariableSetNodeComponent;
+export default memo(VariableSetNodeComponent);

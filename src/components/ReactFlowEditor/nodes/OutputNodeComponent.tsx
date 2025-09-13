@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 
 import { Download } from 'lucide-react';
 
@@ -74,4 +74,4 @@ const OutputNodeComponent = ({ id, data }: any) => {
   );
 };
 
-export default OutputNodeComponent;
+export default memo(OutputNodeComponent);

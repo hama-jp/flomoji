@@ -1,6 +1,7 @@
 import { useCallback } from 'react'
 
 import nodeExecutionService from '../services/nodeExecutionService'
+import { errorService } from '../services/errorService'
 import { WorkflowNode, WorkflowEdge, LogEntry, NodeExecutionState, Executor, ExecutionState, ExecutionResult, DebugLogEntry } from '../types';
 
 interface UseWorkflowExecutionProps {
@@ -184,8 +185,14 @@ const useWorkflowExecution = ({
         setExecutionResult({ success: false, error: finalState.error?.message || 'Unknown error' });
       }
     } catch (error: any) {
-      console.error("Workflow execution failed:", error);
-      console.error("Error stack:", error.stack);
+      // Use error service instead of console.error
+      errorService.logError(error, {
+        context: 'workflow_execution'
+      }, {
+        category: 'execution',
+        userMessage: 'ワークフロー実行中にエラーが発生しました',
+        retryable: true
+      });
       
       // 例外エラー時のログを追加
       const executionLog = nodeExecutionService.getExecutionLog();
@@ -323,7 +330,13 @@ const useWorkflowExecution = ({
         });
       }
     } catch (error: any) {
-      console.error("Step forward failed:", error);
+      errorService.logError(error, {
+        context: 'step_forward'
+      }, {
+        category: 'execution',
+        userMessage: 'ステップ実行中にエラーが発生しました',
+        retryable: true
+      });
       setExecutionResult({ success: false, error: error.message });
       // Reset execution directly to avoid circular dependency
       if (executor) executor.stop();

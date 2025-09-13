@@ -199,4 +199,4 @@ const WebSearchNodeComponent = memo(({ data = {}, id }: WebSearchNodeComponentPr
 
 WebSearchNodeComponent.displayName = 'WebSearchNodeComponent';
 
-export default WebSearchNodeComponent;
+export default memo(WebSearchNodeComponent);

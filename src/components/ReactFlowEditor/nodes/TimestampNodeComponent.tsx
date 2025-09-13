@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, memo } from 'react';
 
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -208,4 +208,4 @@ const TimestampNodeComponent = ({ id, data }: any) => {
   );
 };
 
-export default TimestampNodeComponent;
+export default memo(TimestampNodeComponent);
