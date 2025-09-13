@@ -248,4 +248,4 @@ const CodeExecutionNodeComponent = memo(({ data = {}, id }: { data?: any; id: st
 
 CodeExecutionNodeComponent.displayName = 'CodeExecutionNodeComponent';
 
-export default CodeExecutionNodeComponent;
+export default memo(CodeExecutionNodeComponent);

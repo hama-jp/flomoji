@@ -15,12 +15,24 @@ import { devtools } from 'zustand/middleware';
 import workflowManagerService from '../services/workflowManagerService';
 import type { NodeData } from '../types/nodes';
 
+// Undo/Redo用の履歴状態
+interface HistoryState {
+  nodes: Node[];
+  edges: Edge[];
+  viewport: Viewport;
+}
+
 // ReactFlow store state interface
 interface ReactFlowState {
   nodes: Node[];
   edges: Edge[];
   viewport: Viewport;
-  
+
+  // Undo/Redo履歴管理
+  history: HistoryState[];
+  historyIndex: number;
+  maxHistorySize: number;
+
   onNodesChange: (changes: NodeChange[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
   onConnect: (connection: Connection) => void;
@@ -31,7 +43,18 @@ interface ReactFlowState {
   deleteSelectedElements: () => void;
   setViewport: (viewport: Viewport) => void;
   loadWorkflow: (id: string) => void;
+
+  // Undo/Redo機能
+  undo: () => void;
+  redo: () => void;
+  canUndo: () => boolean;
+  canRedo: () => boolean;
+  saveToHistory: () => void;
+  clearHistory: () => void;
 }
+
+// デバウンス用のタイマー
+let historyDebounceTimer: NodeJS.Timeout | null = null;
 
 const useReactFlowStore = create<ReactFlowState>()(
   devtools(
@@ -40,12 +63,19 @@ const useReactFlowStore = create<ReactFlowState>()(
       edges: [],
       viewport: { x: 0, y: 0, zoom: 1 },
 
+      // Undo/Redo履歴
+      history: [],
+      historyIndex: -1,
+      maxHistorySize: 50,
+
       onNodesChange: (changes: NodeChange[]) => {
         const currentNodes = get().nodes;
         const nodes = Array.isArray(currentNodes) ? currentNodes : [];
         set({
           nodes: applyNodeChanges(changes, nodes),
         });
+        // 履歴に保存
+        get().saveToHistory();
       },
 
       onEdgesChange: (changes: EdgeChange[]) => {
@@ -54,18 +84,22 @@ const useReactFlowStore = create<ReactFlowState>()(
         set({
           edges: applyEdgeChanges(changes, edges),
         });
+        // 履歴に保存
+        get().saveToHistory();
       },
 
       onConnect: (connection: Connection) => {
         const currentEdges = get().edges;
         const edges = Array.isArray(currentEdges) ? currentEdges : [];
         set({
-          edges: addEdge({ 
-            ...connection, 
+          edges: addEdge({
+            ...connection,
             type: 'custom',
             markerEnd: { type: 'arrow' as const }
           }, edges),
         });
+        // 履歴に保存
+        get().saveToHistory();
       },
 
       setNodes: (nodesOrUpdater) => {
@@ -131,20 +165,23 @@ const useReactFlowStore = create<ReactFlowState>()(
         console.log('🔄 loadWorkflow called with id:', id);
         const workflow = workflowManagerService.getWorkflow(id);
         console.log('📂 Retrieved workflow:', workflow);
-        
+
         if (workflow && workflow.flow) {
           const { nodes, edges, viewport }: any = workflow.flow;
           console.log('📊 Loading workflow data - nodes:', nodes?.length || 0, 'edges:', edges?.length || 0);
           console.log('📋 Node details:', nodes);
-          
+
           const newState = {
             nodes: Array.isArray(nodes) ? nodes : [],
             edges: Array.isArray(edges) ? edges : [],
             viewport: viewport || { x: 0, y: 0, zoom: 1 },
           };
-          
+
           set(newState);
-          
+
+          // ワークフロー読み込み時は履歴をクリア
+          get().clearHistory();
+
           // ストアの状態を確認
           const currentState = get();
           console.log('✅ Workflow loaded - Store state nodes:', currentState.nodes?.length || 0);
@@ -156,7 +193,114 @@ const useReactFlowStore = create<ReactFlowState>()(
             edges: [],
             viewport: { x: 0, y: 0, zoom: 1 },
           });
+          get().clearHistory();
         }
+      },
+
+      // Undo/Redo機能の実装
+      saveToHistory: () => {
+        // デバウンス処理
+        if (historyDebounceTimer) {
+          clearTimeout(historyDebounceTimer);
+        }
+
+        historyDebounceTimer = setTimeout(() => {
+          const state = get();
+          const currentState: HistoryState = {
+            nodes: state.nodes,
+            edges: state.edges,
+            viewport: state.viewport
+          };
+
+          // 現在のインデックス以降の履歴を削除（新しい分岐を作成）
+          const newHistory = state.history.slice(0, state.historyIndex + 1);
+          newHistory.push(currentState);
+
+          // 履歴サイズの制限
+          if (newHistory.length > state.maxHistorySize) {
+            newHistory.shift();
+          }
+
+          set({
+            history: newHistory,
+            historyIndex: newHistory.length - 1
+          });
+
+          console.log('💾 Saved to history', {
+            historyLength: newHistory.length,
+            currentIndex: newHistory.length - 1
+          });
+        }, 500); // 500msのデバウンス
+      },
+
+      undo: () => {
+        const state = get();
+        if (state.historyIndex > 0) {
+          const newIndex = state.historyIndex - 1;
+          const previousState = state.history[newIndex];
+
+          set({
+            nodes: previousState.nodes,
+            edges: previousState.edges,
+            viewport: previousState.viewport,
+            historyIndex: newIndex
+          });
+
+          console.log('↩️ Undo performed', {
+            newIndex,
+            historyLength: state.history.length
+          });
+        }
+      },
+
+      redo: () => {
+        const state = get();
+        if (state.historyIndex < state.history.length - 1) {
+          const newIndex = state.historyIndex + 1;
+          const nextState = state.history[newIndex];
+
+          set({
+            nodes: nextState.nodes,
+            edges: nextState.edges,
+            viewport: nextState.viewport,
+            historyIndex: newIndex
+          });
+
+          console.log('↪️ Redo performed', {
+            newIndex,
+            historyLength: state.history.length
+          });
+        }
+      },
+
+      canUndo: () => {
+        const state = get();
+        return state.historyIndex > 0;
+      },
+
+      canRedo: () => {
+        const state = get();
+        return state.historyIndex < state.history.length - 1;
+      },
+
+      clearHistory: () => {
+        if (historyDebounceTimer) {
+          clearTimeout(historyDebounceTimer);
+        }
+
+        const state = get();
+        const currentState: HistoryState = {
+          nodes: state.nodes,
+          edges: state.edges,
+          viewport: state.viewport
+        };
+
+        set({
+          history: [currentState],
+          historyIndex: 0
+        });
+
+        console.log('🗑️ History cleared');
       },
     }),
     {

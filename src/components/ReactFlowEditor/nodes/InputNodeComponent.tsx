@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 
 import { Textarea } from '@/components/ui/textarea';
 
@@ -35,4 +35,4 @@ const InputNodeComponent = ({ id, data }: any) => {
   );
 };
 
-export default InputNodeComponent;
+export default memo(InputNodeComponent);

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 
 import { Textarea } from '@/components/ui/textarea';
 
@@ -44,4 +44,4 @@ const LLMNodeComponent = ({ id, data }: any) => {
   );
 };
 
-export default LLMNodeComponent;
+export default memo(LLMNodeComponent);

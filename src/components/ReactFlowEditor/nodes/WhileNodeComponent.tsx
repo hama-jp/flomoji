@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 
 import { Textarea } from '@/components/ui/textarea';
 
@@ -47,4 +47,4 @@ const WhileNodeComponent = ({ id, data }: any) => {
   );
 };
 
-export default WhileNodeComponent;
+export default memo(WhileNodeComponent);

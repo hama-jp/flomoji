@@ -1,5 +1,6 @@
 // LLMサービス接続機能
 import StorageService from './storageService';
+import { errorService } from './errorService';
 import { LLMSettings, LLMMessage } from '../types';
 
 // Provider types
@@ -198,7 +199,7 @@ class LLMService {
         
         // デバッグ: APIレスポンス詳細を表示（一時的）
         if (result === 'レスポンスが空です') {
-          console.warn('API Response Analysis:', {
+          errorService.logError(new Error('Empty API response'), {
             model: model,
             responseStatus: response.status,
             responseStatusText: response.statusText,
@@ -210,6 +211,10 @@ class LLMService {
             messageStructure: openAIData.choices?.[0] ? Object.keys(openAIData.choices[0]) : 'No first choice',
             actualContent: openAIData.choices?.[0]?.message?.content,
             errorField: openAIData.error
+          }, {
+            severity: 'warning',
+            category: 'network',
+            userMessage: 'AIからの応答が空でした'
           });
         }
         

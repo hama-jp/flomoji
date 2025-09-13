@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 
 import CustomNode from './CustomNode';
 
@@ -24,4 +24,4 @@ const TextCombinerNodeComponent = ({ id, data }: any) => {
   );
 };
 
-export default TextCombinerNodeComponent;
+export default memo(TextCombinerNodeComponent);

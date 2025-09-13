@@ -148,4 +148,18 @@ const CustomNode = ({ data, children, id }: CustomNodeProps) => {
   );
 };
 
-export default memo(CustomNode);
+// カスタム比較関数で細かい制御
+const arePropsEqual = (prevProps: CustomNodeProps, nextProps: CustomNodeProps) => {
+  // データが同じで、選択状態が変わらなければ再レンダリング不要
+  // 注: selected propは現在のインターフェースには含まれていないが、将来の拡張に備える
+  return (
+    prevProps.id === nextProps.id &&
+    prevProps.data.label === nextProps.data.label &&
+    prevProps.data.inputs === nextProps.data.inputs &&
+    prevProps.data.outputs === nextProps.data.outputs &&
+    prevProps.data.colorClass === nextProps.data.colorClass &&
+    prevProps.children === nextProps.children
+  );
+};
+
+export default memo(CustomNode, arePropsEqual);

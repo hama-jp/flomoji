@@ -1,4 +1,5 @@
 import type { WorkflowNode, NodeInputs, NodeOutput, ExecutionContext } from '../types';
+import { errorService } from '../services/errorService';
 
 /**
  * Node execution context interface
@@ -39,7 +40,14 @@ export async function withNodeExecution<T>(
       }
     };
   } catch (error) {
-    console.error(`Node ${context.node.id} execution failed:`, error);
+    errorService.logError(error as Error, {
+      nodeId: context.node.id,
+      nodeType: context.node.type
+    }, {
+      category: 'execution',
+      userMessage: `ノード実行エラー: ${context.node.type}`,
+      retryable: true
+    });
     return {
       output: null,
       error: error instanceof Error ? error.message : String(error),

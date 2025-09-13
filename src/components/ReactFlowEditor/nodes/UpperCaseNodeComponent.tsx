@@ -122,4 +122,4 @@ const UpperCaseNodeComponent = memo(({ data = {}, id }: { data?: any; id: string
 
 UpperCaseNodeComponent.displayName = 'UpperCaseNodeComponent';
 
-export default UpperCaseNodeComponent;
+export default memo(UpperCaseNodeComponent);

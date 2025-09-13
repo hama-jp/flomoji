@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, memo } from 'react';
 
 import { Handle, Position } from '@xyflow/react';
 import { 
@@ -337,4 +337,4 @@ const WebAPINodeComponent = ({ id, data, selected }: any) => {
   );
 };
 
-export default WebAPINodeComponent;
+export default memo(WebAPINodeComponent);

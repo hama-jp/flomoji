@@ -6,6 +6,9 @@
 import type { Workflow } from '../types';
 
 import StorageService from './storageService';
+import { createModuleLogger } from '../utils/logger';
+
+const logger = createModuleLogger('WorkflowManager');
 
 /**
  * Generate a unique ID for workflows
@@ -21,13 +24,13 @@ async function loadSampleWorkflow(filename: string): Promise<Workflow | null> {
   try {
     const response = await fetch(`/samples/${filename}`);
     if (!response.ok) {
-      console.warn(`Failed to load sample file ${filename}`);
+      logger.warn(`Failed to load sample file ${filename}`);
       return null;
     }
     const workflow = await response.json();
     return workflow;
   } catch (error: any) {
-    console.warn(`Failed to parse sample file ${filename}:`, error);
+    logger.warn(`Failed to parse sample file ${filename}:`, error);
     return null;
   }
 }
@@ -43,7 +46,7 @@ class WorkflowManagerService {
     
     const workflows = this.getWorkflows();
     if (Object.keys(workflows).length === 0) {
-      console.log('Setting up initial workflows...');
+      logger.info('Setting up initial workflows...');
       await this._loadInitialSamples();
     }
     this._initialized = true;
@@ -70,23 +73,25 @@ class WorkflowManagerService {
           id: generateId(),
           lastModified: new Date().toISOString()
         };
-        console.log('💾 Saving sample workflow:', workflowWithNewId.name, 'nodes:', workflowWithNewId.flow?.nodes?.length || 0);
+        logger.info(`Saving sample workflow: ${workflowWithNewId.name}`, {
+          nodes: workflowWithNewId.flow?.nodes?.length || 0
+        });
         this.saveWorkflow(workflowWithNewId);
         loadedWorkflows.push(workflowWithNewId);
-        console.log(`✅ Imported sample workflow "${workflow.name}"`);
+        logger.info(`Imported sample workflow "${workflow.name}"`);
       }
     }
 
     // Set the first loaded workflow as the current workflow
     if (loadedWorkflows.length > 0) {
       this.setCurrentWorkflowId(loadedWorkflows[0].id);
-      console.log(`Set "${loadedWorkflows[0].name}" as initial workflow`);
+      logger.info(`Set "${loadedWorkflows[0].name}" as initial workflow`);
     } else {
       // Create a default workflow if sample files couldn't be loaded
       const newWorkflow = this.createNewWorkflow();
       this.saveWorkflow(newWorkflow);
       this.setCurrentWorkflowId(newWorkflow.id);
-      console.log('Created default workflow');
+      logger.info('Created default workflow');
     }
   }
 
@@ -110,7 +115,7 @@ class WorkflowManagerService {
    */
   saveWorkflow(workflowData: Workflow): void {
     if (!workflowData || !workflowData.id) {
-      console.error("Invalid workflow data provided to saveWorkflow");
+      logger.error("Invalid workflow data provided to saveWorkflow");
       return;
     }
     const workflows = this.getWorkflows();

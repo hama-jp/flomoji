@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Download, Upload, Trash2, FileText, MessageSquare, Workflow, History, Settings, ArrowUpDown, ArrowUp, ArrowDown, Clock, CheckCircle, XCircle, Loader, ChevronDown, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { errorService } from '@/services/errorService'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import workflowManagerService from '../services/workflowManagerService'
 import logService from '../services/logService'
@@ -26,7 +27,12 @@ const DataView = () => {
       const sessions = groupChatMessages(history)
       setChatHistory(sessions)
     } catch (error) {
-      console.error('Failed to load chat history:', error)
+      errorService.logError(error as Error, {
+        context: 'load_chat_history'
+      }, {
+        category: 'system',
+        userMessage: 'チャット履歴の読み込みに失敗しました'
+      })
       setChatHistory([])
     }
 
@@ -146,7 +152,12 @@ const DataView = () => {
         await logService.clearAllLogs()
         alert('Execution history has been deleted')
       } catch (error: any) {
-        console.error('実行履歴の削除に失敗しました:', error)
+        errorService.logError(error as Error, {
+          context: 'delete_execution_history'
+        }, {
+          category: 'system',
+          userMessage: '実行履歴の削除に失敗しました'
+        })
         alert('Failed to delete execution history')
       }
     }
@@ -156,17 +167,25 @@ const DataView = () => {
     if (confirm('Delete all data? This action cannot be undone.')) {
       StorageService.clear() // 全てのStorageServiceキーをクリア
       // 実行履歴も削除
-      logService.clearAllLogs().catch(console.error)
+      logService.clearAllLogs().catch(err => {
+        errorService.logError(err, {
+          context: 'clear_logs'
+        }, {
+          category: 'system',
+          userMessage: 'ログのクリアに失敗しました'
+        })
+      })
       loadData()
       alert('All data has been deleted')
     }
   }
 
-  const calculateStorageSize = () => {
+  // ストレージサイズの計算をメモ化
+  const storageSize = useMemo(() => {
     const usageInfo = StorageService.getUsageInfo()
     const totalSize = Object.values(usageInfo).reduce((total, info) => total + info.size, 0)
     return (totalSize / 1024).toFixed(1) + ' KB'
-  }
+  }, [workflowData]) // workflowDataが変更されたときに再計算
 
   const formatDate = (dateString: string | Date | null | undefined) => {
     if (!dateString) return 'Unknown'
@@ -178,20 +197,24 @@ const DataView = () => {
     }
   }
 
-  // ワークフローデータをソート
-  const sortedWorkflowData = [...workflowData].sort((a, b) => {
-    let comparison = 0
-    
-    if (sortBy === 'timestamp') {
-      const dateA = new Date((a.lastModified ?? a.createdAt) || 0)
-      const dateB = new Date((b.lastModified ?? b.createdAt) || 0)
-      comparison = dateA.getTime() - dateB.getTime()
-    } else if (sortBy === 'name') {
-      comparison = (a.name || '').localeCompare(b.name || '', 'ja-JP')
-    }
-    
-    return sortOrder === 'desc' ? -comparison : comparison
-  })
+  // ワークフローデータをソート（メモ化で最適化）
+  const sortedWorkflowData = useMemo(() => {
+    const sorted = [...workflowData]
+    sorted.sort((a, b) => {
+      let comparison = 0
+
+      if (sortBy === 'timestamp') {
+        const dateA = new Date((a.lastModified ?? a.createdAt) || 0)
+        const dateB = new Date((b.lastModified ?? b.createdAt) || 0)
+        comparison = dateA.getTime() - dateB.getTime()
+      } else if (sortBy === 'name') {
+        comparison = (a.name || '').localeCompare(b.name || '', 'ja-JP')
+      }
+
+      return sortOrder === 'desc' ? -comparison : comparison
+    })
+    return sorted
+  }, [workflowData, sortBy, sortOrder])
 
   // ソート切り替え関数
   const handleSort = (newSortBy: 'timestamp' | 'name') => {
@@ -578,7 +601,7 @@ const DataView = () => {
                   <h4 className="font-medium text-gray-900">Local Storage Usage</h4>
                   <p className="text-sm text-gray-600 mt-1">Used for storing settings and data</p>
                 </div>
-                <Badge variant="secondary" className="text-base px-3 py-1">{calculateStorageSize()}</Badge>
+                <Badge variant="secondary" className="text-base px-3 py-1">{storageSize}</Badge>
               </div>
               
               <div className="flex justify-between items-center p-5 bg-amber-50 rounded-lg border border-amber-200">

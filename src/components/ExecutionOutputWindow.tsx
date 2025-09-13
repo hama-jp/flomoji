@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, memo } from 'react';
 
 import { Minimize2, Maximize2, Terminal, CheckCircle, XCircle } from 'lucide-react';
 
@@ -15,6 +15,11 @@ interface ExecutionOutputWindowProps {
   executionState: any;
 }
 
+// ヘルパー関数をコンポーネント外に定義
+const formatTimestamp = (timestamp: string | number) => {
+  return new Date(timestamp).toLocaleTimeString();
+};
+
 const ExecutionOutputWindow = ({ 
   isOpen, 
   onClose, 
@@ -23,6 +28,18 @@ const ExecutionOutputWindow = ({
   executionState 
 }: ExecutionOutputWindowProps) => {
   const [isMinimized, setIsMinimized] = useState(false);
+
+  // デバッグログの処理をメモ化
+  const processedLogs = useMemo(() => {
+    if (!debugLog || debugLog.length === 0) return [];
+    // ログのフィルタリングや前処理をここで行う
+    return debugLog.map((log, index) => ({
+      ...log,
+      key: `log-${index}-${log.timestamp}`, // 安定したキーを生成
+      formattedTimestamp: formatTimestamp(log.timestamp)
+    }));
+  }, [debugLog]);
+
   // 右端に縦長で配置するための初期設定
   const [position, setPosition] = useState(() => {
     const rightMargin = 20; // 右端からの余白
@@ -105,10 +122,6 @@ const ExecutionOutputWindow = ({
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, [size.width]);
-
-  const formatTimestamp = (timestamp: string | number) => {
-    return new Date(timestamp).toLocaleTimeString();
-  };
 
   const getLogLevelIcon = (level: string) => {
     switch (level) {
@@ -254,14 +267,14 @@ const ExecutionOutputWindow = ({
             </TabsContent>
             
             <TabsContent value="logs" className="flex-1 p-3 overflow-auto">
-              {debugLog && debugLog.length > 0 ? (
+              {processedLogs.length > 0 ? (
                 <div className="space-y-2">
-                  {debugLog.map((log, index: any) => (
-                    <div key={index} className={`flex items-start space-x-3 text-xs p-3 rounded ${getLogLevelColor(log.level)}`}>
+                  {processedLogs.map((log: any) => (
+                    <div key={log.key} className={`flex items-start space-x-3 text-xs p-3 rounded ${getLogLevelColor(log.level)}`}>
                       {getLogLevelIcon(log.level)}
                       <div className="flex-1 min-w-0 select-text">
                         <div className="flex items-center space-x-2 mb-1">
-                          <span className="text-gray-600 font-mono select-text">{formatTimestamp(log.timestamp)}</span>
+                          <span className="text-gray-600 font-mono select-text">{log.formattedTimestamp}</span>
                           <Badge variant={log.level === 'success' ? 'default' : log.level === 'error' ? 'destructive' : 'secondary'} className={`text-xs select-text`}>
                             {log.level.toUpperCase()}
                           </Badge>
@@ -311,4 +324,4 @@ const ExecutionOutputWindow = ({
   );
 };
 
-export default ExecutionOutputWindow;
+export default memo(ExecutionOutputWindow);

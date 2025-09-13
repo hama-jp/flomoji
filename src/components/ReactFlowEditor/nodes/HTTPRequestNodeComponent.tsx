@@ -207,4 +207,4 @@ const HTTPRequestNodeComponent = memo(({ data = {}, id }: { data?: any; id: stri
 
 HTTPRequestNodeComponent.displayName = 'HTTPRequestNodeComponent';
 
-export default HTTPRequestNodeComponent;
+export default memo(HTTPRequestNodeComponent);
