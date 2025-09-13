@@ -119,7 +119,7 @@ describe('nodeExecutionService', () => {
       expect(result3.value.status).toBe('completed');
     });
 
-    it.skip('should handle workflow execution error', async () => {
+    it.skip('should handle workflow execution error - needs singleton state fix', async () => {
       const nodes: any[] = [
         {
           id: 'code-1',
@@ -192,7 +192,7 @@ describe('nodeExecutionService', () => {
       nodeExecutionService.stopExecution();
     });
 
-    it.skip('should handle circular dependencies', async () => {
+    it.skip('should handle circular dependencies - needs singleton state fix', async () => {
       const nodes: any[] = [
         {
           id: 'node-1',
@@ -225,7 +225,7 @@ describe('nodeExecutionService', () => {
       ).rejects.toThrow('循環依存が検出されました');
     });
 
-    it.skip('should handle isolated nodes', async () => {
+    it.skip('should handle isolated nodes - needs singleton state fix', async () => {
       const nodes: any[] = [
         {
           id: 'connected-1',
@@ -268,7 +268,10 @@ describe('nodeExecutionService', () => {
   });
 
   describe('Debug and Logging', () => {
-    it.skip('should add log entries', () => {
+    it.skip('should add log entries - needs singleton state fix', () => {
+      // Clear any existing logs first
+      nodeExecutionService.clearLog();
+      
       nodeExecutionService.addLog('info', 'Test message', 'test-node', { data: 'test' });
       const logs = nodeExecutionService.getExecutionLog();
       
