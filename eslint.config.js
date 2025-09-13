@@ -76,7 +76,7 @@ export default [
       ],
       'import/newline-after-import': 'error',
       'import/no-duplicates': 'error',
-      'import/no-unresolved': ['error', { ignore: ['^@/'] }],
+      'import/no-unresolved': ['error', { ignore: ['^@/', '@tailwindcss/vite'] }],
       'import/no-cycle': 'error',
       'import/no-self-import': 'error',
     },
