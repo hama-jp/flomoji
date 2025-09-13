@@ -46,15 +46,29 @@ describe('workflowManagerService', () => {
     vi.spyOn(StorageService, 'setCurrentWorkflowId').mockImplementation(() => true);
 
     // workflowManagerServiceの内部状態をリセット
-    // プライベートプロパティに直接アクセスして初期化
-    (workflowManagerService as any).workflows = {};
-    (workflowManagerService as any).currentWorkflowId = null;
+    // resetメソッドを使用して_initializedフラグをリセット
+    (workflowManagerService as any).reset();
   });
 
   it('should initialize with sample workflows when none exist', async () => {
-    // initialize() は beforeEach で呼ばれるため、ここでは結果を確認する
-    // initialize() が非同期なのでawaitを追加
-    await (workflowManagerService as any).initialize();
+    // Mock the StorageService to track workflow saves
+    const savedWorkflows: Record<string, Workflow> = {};
+    let currentId: string | null = null;
+    
+    vi.spyOn(StorageService, 'getWorkflows').mockImplementation(() => savedWorkflows);
+    vi.spyOn(StorageService, 'setWorkflows').mockImplementation((workflows) => {
+      Object.assign(savedWorkflows, workflows);
+      return true;
+    });
+    vi.spyOn(StorageService, 'setCurrentWorkflowId').mockImplementation((id) => {
+      currentId = id;
+      return true;
+    });
+    vi.spyOn(StorageService, 'getCurrentWorkflowId').mockImplementation(() => currentId);
+    
+    // initialize() を呼び出す
+    await workflowManagerService.initialize();
+    
     const workflows = workflowManagerService.getWorkflows();
     expect(Object.keys(workflows).length).toBeGreaterThan(0);
     const currentWorkflowId = workflowManagerService.getCurrentWorkflowId();
@@ -62,6 +76,14 @@ describe('workflowManagerService', () => {
   });
 
   it('should save and retrieve a workflow', () => {
+    const savedWorkflows: Record<string, Workflow> = {};
+    
+    vi.spyOn(StorageService, 'getWorkflows').mockImplementation(() => savedWorkflows);
+    vi.spyOn(StorageService, 'setWorkflows').mockImplementation((workflows) => {
+      Object.assign(savedWorkflows, workflows);
+      return true;
+    });
+    
     const newWorkflow = workflowManagerService.createNewWorkflow('Test Flow');
     workflowManagerService.saveWorkflow(newWorkflow);
 
@@ -75,6 +97,14 @@ describe('workflowManagerService', () => {
   });
 
   it('should get all workflows', () => {
+    const savedWorkflows: Record<string, Workflow> = {};
+    
+    vi.spyOn(StorageService, 'getWorkflows').mockImplementation(() => savedWorkflows);
+    vi.spyOn(StorageService, 'setWorkflows').mockImplementation((workflows) => {
+      Object.assign(savedWorkflows, workflows);
+      return true;
+    });
+    
     const wf1 = workflowManagerService.createNewWorkflow('Flow 1');
     const wf2 = workflowManagerService.createNewWorkflow('Flow 2');
     workflowManagerService.saveWorkflow(wf1);
@@ -90,6 +120,25 @@ describe('workflowManagerService', () => {
   });
 
   it('should delete a workflow', () => {
+    const savedWorkflows: Record<string, Workflow> = {};
+    let currentId: string | null = null;
+    
+    vi.spyOn(StorageService, 'getWorkflows').mockImplementation(() => {
+      // Return a copy to allow delete operations
+      return { ...savedWorkflows };
+    });
+    vi.spyOn(StorageService, 'setWorkflows').mockImplementation((workflows) => {
+      // Clear and reassign to simulate deletion
+      Object.keys(savedWorkflows).forEach(key => delete savedWorkflows[key]);
+      Object.assign(savedWorkflows, workflows);
+      return true;
+    });
+    vi.spyOn(StorageService, 'setCurrentWorkflowId').mockImplementation((id) => {
+      currentId = id;
+      return true;
+    });
+    vi.spyOn(StorageService, 'getCurrentWorkflowId').mockImplementation(() => currentId);
+    
     const wf1 = workflowManagerService.createNewWorkflow('Flow 1');
     workflowManagerService.saveWorkflow(wf1);
 
@@ -107,6 +156,14 @@ describe('workflowManagerService', () => {
   });
 
   it('should manage current workflow ID', () => {
+    let currentId: string | null = null;
+    
+    vi.spyOn(StorageService, 'setCurrentWorkflowId').mockImplementation((id) => {
+      currentId = id;
+      return true;
+    });
+    vi.spyOn(StorageService, 'getCurrentWorkflowId').mockImplementation(() => currentId);
+    
     workflowManagerService.setCurrentWorkflowId('test-id');
     expect(workflowManagerService.getCurrentWorkflowId()).toBe('test-id');
   });
