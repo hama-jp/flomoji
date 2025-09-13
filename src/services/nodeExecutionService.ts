@@ -155,6 +155,7 @@ class NodeExecutionService {
       const executionOrder = analysis.executionOrder;
       const context = this.context;
       const isExecutingRef = { value: true };
+      const self = this; // Reference to NodeExecutionService instance
       
       this.executor = {
         async next(): Promise<IteratorResult<NodeExecutionState>> {
@@ -169,6 +170,7 @@ class NodeExecutionService {
             isExecutingRef.value = false;
             context.addLog('success', 'ワークフロー実行完了');
             await context.updateRunStatus('completed');
+            self.isExecuting = false; // Reset main execution flag
             return { 
               done: true, 
               value: { 
@@ -205,6 +207,7 @@ class NodeExecutionService {
             });
             isExecutingRef.value = false;
             await context.updateRunStatus('failed');
+            self.isExecuting = false; // Reset main execution flag on error
             return { 
               done: true, 
               value: { 
@@ -218,7 +221,7 @@ class NodeExecutionService {
 
         stop: () => {
           isExecutingRef.value = false;
-          this.stopExecution();
+          self.stopExecution();
         }
       };
 
@@ -252,10 +255,24 @@ class NodeExecutionService {
    * Clean up resources
    */
   cleanup(): void {
-    this.context?.cleanup();
-    this.context = null;
+    // Force stop any running execution
     this.isExecuting = false;
     this.executor = null;
+    this.context?.cleanup();
+    this.context = null;
+  }
+
+  /**
+   * Reset service for testing
+   * This method ensures complete state reset for test isolation
+   */
+  reset(): void {
+    this.isExecuting = false;
+    this.executor = null;
+    this.context?.cleanup();
+    this.context = null;
+    // Reset node types to default
+    this.nodeTypesRegistry = nodeTypes;
   }
 }
 
