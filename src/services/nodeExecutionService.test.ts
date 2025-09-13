@@ -43,21 +43,13 @@ describe('nodeExecutionService', () => {
     localStorageMock.clear();
     vi.clearAllTimers();
     // Reset service state for test isolation
-    if ('reset' in nodeExecutionService) {
-      (nodeExecutionService as any).reset();
-    } else {
-      nodeExecutionService.cleanup();
-    }
+    (nodeExecutionService as any).reset();
   });
 
   afterEach(() => {
     // Ensure execution is stopped and state is reset after each test
     nodeExecutionService.stopExecution();
-    if ('reset' in nodeExecutionService) {
-      (nodeExecutionService as any).reset();
-    } else {
-      nodeExecutionService.cleanup();
-    }
+    (nodeExecutionService as any).reset();
   });
 
   describe('Workflow Execution', () => {
@@ -274,7 +266,7 @@ describe('nodeExecutionService', () => {
       let steps = 0;
       while (!done && steps < 10) {
         const result = await generator.next();
-        done = result.done;
+        done = result.done || false;
         steps++;
       }
       expect(done).toBe(true);
