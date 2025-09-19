@@ -13,6 +13,7 @@ import InputNode from './InputNode';
 import LLMNode from './LLMNode';
 import OutputNode from './OutputNode';
 import ScheduleNode from './ScheduleNode';
+import StructuredExtractionNode from './StructuredExtractionNode';
 import TextCombinerNode from './TextCombinerNode';
 import TimestampNode from './TimestampNode';
 import VariableSetNode from './VariableSetNode';
@@ -26,9 +27,10 @@ import WhileNode from './WhileNode';
  */
 export const nodeTypes: Record<string, ExtendedNodeDefinition> = {
   input: InputNode,
-  output: OutputNode, 
+  output: OutputNode,
   llm: LLMNode,
   text_combiner: TextCombinerNode,
+  structured_extraction: StructuredExtractionNode,
   if: IfNode,
   while: WhileNode,
   variable_set: VariableSetNode,
@@ -58,6 +60,7 @@ export const nodesByCategory: Record<string, { name: string; nodes: Record<strin
     nodes: {
       llm: LLMNode,
       text_combiner: TextCombinerNode,
+      structured_extraction: StructuredExtractionNode,
       code_execution: CodeExecutionNode
     }
   },
