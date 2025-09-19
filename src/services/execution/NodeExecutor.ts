@@ -10,8 +10,8 @@ import llmService from '../llmService';
 import { ExecutionContext } from './ExecutionContext';
 
 export class NodeExecutor {
-  private context: ExecutionContext;
-  private nodeTypes: Record<string, any>;
+  protected context: ExecutionContext;
+  protected nodeTypes: Record<string, any>;
 
   constructor(context: ExecutionContext, nodeTypes: Record<string, any>) {
     this.context = context;
@@ -235,7 +235,7 @@ export class NodeExecutor {
   /**
    * Get inputs for a node from connections
    */
-  private getNodeInputs(
+  protected getNodeInputs(
     node: WorkflowNode,
     connections: NodeConnection[],
     nodes: WorkflowNode[]
