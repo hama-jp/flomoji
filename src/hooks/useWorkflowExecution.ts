@@ -2,6 +2,7 @@ import { useCallback } from 'react'
 
 import nodeExecutionService from '../services/nodeExecutionService'
 import { errorService } from '../services/errorService'
+import { useDebuggerStore } from '../store/debuggerStore'
 import { WorkflowNode, WorkflowEdge, LogEntry, NodeExecutionState, Executor, ExecutionState, ExecutionResult, DebugLogEntry } from '../types';
 
 interface UseWorkflowExecutionProps {
@@ -74,42 +75,65 @@ const useWorkflowExecution = ({
     const inputNodes = preprocessedNodes.filter(n => n.type === 'input');
     const inputData = Object.fromEntries(inputNodes.map(n => [n.id, n.data.value || '']));
     const convertedConnections = convertConnectionsFormat();
-    const exec = await nodeExecutionService.startExecution(preprocessedNodes, convertedConnections, inputData, nodeTypes);
+
+    // Pass debug mode through options instead of direct store access
+    const debuggerStore = useDebuggerStore.getState();
+    const isDebugMode = debuggerStore.debugMode !== 'off';
+
+    const exec = await nodeExecutionService.startExecution(
+      preprocessedNodes,
+      convertedConnections,
+      inputData,
+      nodeTypes,
+      { debugMode: isDebugMode }
+    );
 
     setExecutor(exec as Executor);
     const initialState: ExecutionState = { running: true, currentNodeId: null, executedNodeIds: new Set<string>() };
     setExecutionState(initialState);
     setDebugLog([]);
-    nodeExecutionService.setDebugMode(true);
+    nodeExecutionService.setDebugMode(isDebugMode);
+
+    // Create and set abort controller for this execution
+    const abortController = new AbortController();
+    debuggerStore.setAbortController(abortController);
 
     try {
       let result: IteratorResult<NodeExecutionState, any>;
+
+      // If in debug mode, set execution status to running initially
+      if (isDebugMode) {
+        debuggerStore.setExecutionStatus('running');
+      }
+
       do {
         result = await exec.next();
         if (!result.done) {
           // まず実行中のノードを設定（実行前）
           setExecutionState(prev => {
-            const newState: ExecutionState = { 
-              running: true, 
-              currentNodeId: result.value.currentNodeId || null, 
+            const newState: ExecutionState = {
+              running: true,
+              currentNodeId: result.value.currentNodeId || null,
               executedNodeIds: new Set<string>(prev.executedNodeIds)
             };
             return newState;
           });
-          
-          // 各ノードの実行間に少し遅延を入れてアニメーションを見やすくする
-          await new Promise(resolve => setTimeout(resolve, 500));
-          
+
+          // Add delay only in slow mode for animation visibility
+          if (debuggerStore.debugMode === 'slow') {
+            await new Promise(resolve => setTimeout(resolve, debuggerStore.executionSpeed));
+          }
+
           // 実行完了後に実行済みセットに追加
           setExecutionState(prev => {
             const newExecutedIds = new Set<string>(prev.executedNodeIds);
             if (result.value.currentNodeId) {
               newExecutedIds.add(result.value.currentNodeId);
             }
-            const newState: ExecutionState = { 
-              running: true, 
+            const newState: ExecutionState = {
+              running: true,
               currentNodeId: null, // 実行完了後はnullに
-              executedNodeIds: newExecutedIds 
+              executedNodeIds: newExecutedIds
             };
             return newState;
           });
@@ -185,6 +209,19 @@ const useWorkflowExecution = ({
         setExecutionResult({ success: false, error: finalState.error?.message || 'Unknown error' });
       }
     } catch (error: any) {
+      // Check if error is due to abort
+      if (error.message === 'Execution aborted') {
+        setExecutionResult({ success: false, error: 'Execution was cancelled' });
+        setDebugLog([...nodeExecutionService.getExecutionLog(), {
+          timestamp: new Date().toISOString(),
+          level: 'info',
+          message: 'Workflow execution was cancelled by user',
+          nodeId: null,
+          data: {}
+        }]);
+        return;
+      }
+
       // Use error service instead of console.error
       errorService.logError(error, {
         context: 'workflow_execution'
@@ -218,7 +255,10 @@ const useWorkflowExecution = ({
         nodeExecutionService.stopExecution();
       }
     } finally {
-      
+      // Clear abort controller
+      const debuggerStore = useDebuggerStore.getState();
+      debuggerStore.setAbortController(null);
+
       // 実行完了状態を2秒間表示してからリセット
       setTimeout(() => {
         setExecutionState({ running: false, currentNodeId: null, executedNodeIds: new Set() });
@@ -237,9 +277,27 @@ const useWorkflowExecution = ({
         const inputNodes = preprocessedNodes.filter(n => n.type === 'input');
         const inputData = Object.fromEntries(inputNodes.map(n => [n.id, n.data.value || '']));
         const convertedConnections = convertConnectionsFormat();
-        currentExecutor = await nodeExecutionService.startExecution(preprocessedNodes, convertedConnections, inputData) as Executor;
+
+        // Get debugger state and pass it to startExecution
+        const debuggerStore = useDebuggerStore.getState();
+        const isDebugMode = debuggerStore.debugMode !== 'off';
+
+        // Create and set abort controller for step execution
+        const abortController = new AbortController();
+        debuggerStore.setAbortController(abortController);
+
+        currentExecutor = await nodeExecutionService.startExecution(
+          preprocessedNodes,
+          convertedConnections,
+          inputData,
+          nodeTypes,
+          { debugMode: isDebugMode }
+        ) as Executor;
+
         setExecutor(currentExecutor);
         setExecutionState({ running: true, currentNodeId: null, executedNodeIds: new Set() });
+        nodeExecutionService.setDebugMode(isDebugMode);
+
         // ステップ実行開始をログに記録
         setDebugLog([{
           timestamp: new Date().toISOString(),
@@ -330,36 +388,63 @@ const useWorkflowExecution = ({
         });
       }
     } catch (error: any) {
-      errorService.logError(error, {
-        context: 'step_forward'
-      }, {
-        category: 'execution',
-        userMessage: 'ステップ実行中にエラーが発生しました',
-        retryable: true
-      });
-      setExecutionResult({ success: false, error: error.message });
+      // Check if error is due to abort
+      if (error.message === 'Execution aborted') {
+        setExecutionResult({ success: false, error: 'Execution was cancelled' });
+        setDebugLog(prev => [...prev, {
+          timestamp: new Date().toISOString(),
+          level: 'info',
+          message: 'Step execution was cancelled by user',
+          nodeId: null,
+          data: {}
+        }]);
+      } else {
+        errorService.logError(error, {
+          context: 'step_forward'
+        }, {
+          category: 'execution',
+          userMessage: 'ステップ実行中にエラーが発生しました',
+          retryable: true
+        });
+        setExecutionResult({ success: false, error: error.message });
+        setDebugLog([]);
+      }
+
       // Reset execution directly to avoid circular dependency
       if (executor) executor.stop();
       setExecutor(null);
       setExecutionState({ running: false, currentNodeId: null, executedNodeIds: new Set() });
-      setExecutionResult({ success: false, error: error.message });
-      setDebugLog([]);
+    } finally {
+      // Clear abort controller for step execution
+      const debuggerStore = useDebuggerStore.getState();
+      debuggerStore.setAbortController(null);
     }
-  }, [executor, nodes, connections, preprocessNodesForExecution, setNodes, setExecutor, setExecutionState, setExecutionResult, selectedNode, onSelectedNodeChange, setDebugLog, convertConnectionsFormat]);
+  }, [executor, nodes, connections, nodeTypes, preprocessNodesForExecution, setNodes, setExecutor, setExecutionState, setExecutionResult, selectedNode, onSelectedNodeChange, setDebugLog, convertConnectionsFormat]);
 
   const handleResetExecution = useCallback(() => {
+    // First abort any paused debugger execution to unwind cleanly
+    const debuggerStore = useDebuggerStore.getState();
+    debuggerStore.abortExecution();
+
+    // Then stop the executor if it exists
     if (executor) executor.stop();
+
+    // Clear all execution state
     setExecutor(null);
     setExecutionState({ running: false, currentNodeId: null, executedNodeIds: new Set() });
     setExecutionResult(null);
     setDebugLog([]);
-    
-    // 出力ノードの結果もクリア
-    setNodes((prev: WorkflowNode[]) => prev.map(node => 
-      node.type === 'output' 
+
+    // Clear output node results
+    setNodes((prev: WorkflowNode[]) => prev.map(node =>
+      node.type === 'output'
         ? { ...node, data: { ...node.data, result: '' } }
         : node
     ));
+
+    // Ensure debugger status is also reset
+    debuggerStore.setExecutionStatus('idle');
+    debuggerStore.setCurrentNode(null);
   }, [executor, setExecutor, setExecutionState, setExecutionResult, setDebugLog, setNodes]);
 
   return {

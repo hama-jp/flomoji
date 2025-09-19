@@ -11,6 +11,7 @@ import StorageService from './storageService';
 import { ExecutionContext } from './execution/ExecutionContext';
 import { GraphAnalyzer } from './execution/GraphAnalyzer';
 import { NodeExecutor } from './execution/NodeExecutor';
+import { DebuggerEnabledNodeExecutor } from './execution/DebuggerEnabledNodeExecutor';
 
 export interface ExecutionGenerator {
   next(): Promise<IteratorResult<NodeExecutionState>>;
@@ -92,7 +93,11 @@ class NodeExecutionService {
     nodes: WorkflowNode[],
     connections: NodeConnection[],
     inputData: NodeInputs = {},
-    nodeTypes?: Record<string, any>
+    nodeTypes?: Record<string, any>,
+    options?: {
+      debugMode?: boolean;
+      onDebuggerCheck?: () => boolean;
+    }
   ): Promise<ExecutionGenerator> {
     if (this.isExecuting) {
       throw new Error('ワークフローが既に実行中です');
@@ -147,8 +152,12 @@ class NodeExecutionService {
         isolatedNodes: analysis.isolatedNodes.length
       });
 
-      // Create node executor
-      const nodeExecutor = new NodeExecutor(this.context, this.nodeTypesRegistry);
+      // Create node executor based on options or callback
+      const useDebugger = options?.debugMode ??
+                          (options?.onDebuggerCheck ? options.onDebuggerCheck() : false);
+      const nodeExecutor = useDebugger
+        ? new DebuggerEnabledNodeExecutor(this.context, this.nodeTypesRegistry)
+        : new NodeExecutor(this.context, this.nodeTypesRegistry);
       
       // Create execution generator
       let currentIndex = -1;

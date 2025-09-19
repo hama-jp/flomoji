@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flomoji Debugger Test</title>
+</head>
+<body>
+    <h1>Flomoji Debugger Test</h1>
+    <iframe
+        src="http://localhost:5174/"
+        width="100%"
+        height="800"
+        style="border: 2px solid #333;">
+    </iframe>
+
+    <script>
+        // Monitor iframe for errors
+        window.addEventListener('message', function(e) {
+            console.log('Message from iframe:', e.data);
+        });
+
+        // Check if app is loading
+        setTimeout(() => {
+            const iframe = document.querySelector('iframe');
+            try {
+                console.log('Iframe document:', iframe.contentDocument);
+            } catch(e) {
+                console.log('Cannot access iframe (cross-origin)');
+            }
+        }, 2000);
+    </script>
+</body>
+</html>
