@@ -35,6 +35,8 @@ import VariableSetNodeComponent from './nodes/VariableSetNodeComponent';
 import WebSearchNodeComponent from './nodes/WebSearchNodeComponent';
 import WebAPINodeComponent from './nodes/WebAPINodeComponent';
 import WhileNodeComponent from './nodes/WhileNodeComponent';
+import StructuredExtractionNodeComponent from './nodes/StructuredExtractionNodeComponent';
+import SchemaValidatorNodeComponent from './nodes/SchemaValidatorNodeComponent';
 
 import { HandleLabelsProvider } from '../../contexts/HandleLabelsContext';
 import { Workflow, WorkflowNode, WorkflowEdge } from '../../types';
@@ -85,6 +87,8 @@ const ReactFlowEditor = ({ selectedNode, onSelectedNodeChange, onEditingNodeChan
     web_search: WebSearchNodeComponent,
     code_execution: CodeExecutionNodeComponent,
     web_api: WebAPINodeComponent,
+    structured_extraction: StructuredExtractionNodeComponent,
+    schema_validator: SchemaValidatorNodeComponent,
     // 他の未実装ノードタイプはCustomNodeで処理
   }), []); // 空の依存配列（静的な定義）
 

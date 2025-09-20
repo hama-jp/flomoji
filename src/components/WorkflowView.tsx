@@ -4,7 +4,6 @@ import { ReactFlowProvider } from '@xyflow/react';
 
 import ErrorBoundary from './ErrorBoundary.jsx';
 import ReactFlowEditor from './ReactFlowEditor/index.jsx';
-import { DebuggerToolbar } from './DebuggerToolbar';
 import { DebuggerPanel } from './DebuggerPanel';
 import { DataFlowVisualization } from './DataFlowVisualization';
 import type { WorkflowNode } from '../types';
@@ -28,7 +27,6 @@ const WorkflowView = ({ selectedNode, onSelectedNodeChange, editingNode, onEditi
             onEditingNodeChange={onEditingNodeChange}
           />
           <DataFlowVisualization />
-          <DebuggerToolbar />
           <DebuggerPanel />
         </div>
       </ReactFlowProvider>

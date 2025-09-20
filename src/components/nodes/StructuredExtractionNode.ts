@@ -1,8 +1,10 @@
 import Ajv from 'ajv';
+import addFormats from 'ajv-formats';
 import { createNodeDefinition, NodeExecuteFunction } from './types';
 import type { WorkflowNode, NodeInputs, NodeOutput, INodeExecutionContext } from '../../types';
 
 const ajv = new Ajv({ allErrors: true, verbose: true });
+addFormats(ajv);
 
 // Cache for compiled schemas
 const schemaCache = new Map<string, any>();
@@ -42,7 +44,7 @@ function parseBoolean(value: any): boolean {
   if (typeof value === 'number') return value !== 0;
   if (typeof value === 'string') {
     const lower = value.toLowerCase().trim();
-    return lower === 'true' || lower === '1' || lower === 'yes' || lower === 'on';
+    return lower === 'true' || lower === '1' || lower === 'yes' || lower === 'on' || lower === 'active';
   }
   return Boolean(value);
 }
@@ -52,10 +54,9 @@ const execute: NodeExecuteFunction = async (node: WorkflowNode, inputs: NodeInpu
   const data = node.data;
   const text = inputs.text || '';
   const schemaOverride = inputs.schema || data.schema;
-  const llmResponse = inputs.llmResponse; // Optional: if connected to an LLM node
 
-  if (!text && !llmResponse) {
-    throw new Error('No input text or LLM response provided for extraction');
+  if (!text) {
+    throw new Error('No input text provided for extraction');
   }
 
   let schema;
@@ -73,53 +74,25 @@ const execute: NodeExecuteFunction = async (node: WorkflowNode, inputs: NodeInpu
     schemaCache.set(schemaKey, validate);
   }
 
-  let extractedData = {};
-  const validationMode = data.validationMode || 'strict';
-
-  // If we have an LLM response, try to parse and validate it
-  if (llmResponse) {
-    context?.addLog('info', 'Processing LLM response for structured extraction', node.id);
-
-    try {
-      // Parse the LLM response
-      extractedData = typeof llmResponse === 'string' ? JSON.parse(llmResponse) : llmResponse;
-
-      // Validate against schema
-      if (validate(extractedData)) {
-        context?.addLog('success', 'LLM response validated successfully', node.id);
-        return formatOutput(extractedData, data.outputFormat);
-      }
-
-      // Validation failed
-      const errors = validate.errors ? validate.errors.map((e: any) => `${e.instancePath} ${e.message}`).join(', ') : 'Unknown validation error';
-
-      if (validationMode === 'lenient') {
-        context?.addLog('warning', `Validation failed but returning data in lenient mode: ${errors}`, node.id);
-        return formatOutput(extractedData, data.outputFormat);
-      }
-
-      throw new Error(`LLM response failed validation: ${errors}`);
-    } catch (parseError: any) {
-      if (parseError.message.includes('JSON')) {
-        throw new Error(`Failed to parse LLM response as JSON: ${parseError.message}`);
-      }
-      throw parseError;
-    }
-  }
-
   // Process based on extraction mode
   const extractionMode = data.extractionMode || 'hybrid';
 
   // Rule-based extraction (when we have text and rules)
-  if ((extractionMode === 'rules' || extractionMode === 'hybrid') && text && data.rules && data.rules.length > 0) {
+  if ((extractionMode === 'rules' || extractionMode === 'hybrid') && data.rules && data.rules.length > 0) {
     context?.addLog('info', `Attempting rule-based extraction (${data.rules.length} rules)`, node.id);
 
-    extractedData = await extractWithRules(text, data.rules, schema);
+    const extractedData = await extractWithRules(text, data.rules, schema);
 
     // Validate extracted data
     if (validate(extractedData)) {
       context?.addLog('success', 'Rule-based extraction succeeded', node.id);
-      return formatOutput(extractedData, data.outputFormat);
+      return {
+        data: formatOutput(extractedData, data.outputFormat),
+        prompt: null,
+        needsLLM: false,
+        originalText: null,
+        schema: null
+      };
     }
 
     // If rules only mode, fail here
@@ -128,15 +101,11 @@ const execute: NodeExecuteFunction = async (node: WorkflowNode, inputs: NodeInpu
       throw new Error(`Rule-based extraction failed validation: ${errors}`);
     }
 
-    context?.addLog('warning', 'Rule-based extraction failed, preparing LLM prompt', node.id);
+    context?.addLog('warning', 'Rule-based extraction failed validation, preparing LLM prompt', node.id);
   }
 
   // LLM mode or hybrid fallback - generate prompt for LLM
   if (extractionMode === 'llm' || extractionMode === 'hybrid') {
-    if (!text) {
-      throw new Error('Text input is required for LLM prompt generation');
-    }
-
     const prompt = (data.llmPromptTemplate || defaultLLMPrompt)
       .replace('{text}', text)
       .replace('{schema}', JSON.stringify(schema, null, 2));
@@ -144,16 +113,17 @@ const execute: NodeExecuteFunction = async (node: WorkflowNode, inputs: NodeInpu
     context?.addLog('info', 'Generated prompt for LLM extraction', node.id, { promptLength: prompt.length });
 
     // Output the prompt for a downstream LLM node to process
+    // The LLM response should be connected to the Schema Validator node
     return {
+      data: null,
       prompt: prompt,
       needsLLM: true,
       originalText: text,
-      schema: schema,
-      extractionFailed: extractionMode === 'hybrid' // Indicates rules were tried first
+      schema: JSON.stringify(schema, null, 2)
     };
   }
 
-  throw new Error('No valid extraction mode configured or no applicable inputs provided');
+  throw new Error('No valid extraction mode configured');
 };
 
 // Helper function for rule-based extraction
@@ -290,7 +260,7 @@ function inferFieldFromText(text: string, fieldName: string, fieldSchema?: any):
 // Helper function to format output
 function formatOutput(data: any, format: string): any {
   if (format === 'json') {
-    // Return as string directly for JSON format
+    // Return as string for JSON format
     return JSON.stringify(data, null, 2);
   }
   // Return as object for object format
@@ -302,20 +272,26 @@ export const StructuredExtractionNode = createNodeDefinition(
   'Structured Extraction',
   '📄',
   'purple',
-  ['text', 'schema', 'llmResponse'],
+  ['text', 'schema'],
   ['data', 'prompt', 'needsLLM', 'originalText', 'schema'],
   {
     extractionMode: 'hybrid',
     schema: defaultSchema,
     rules: [],
     llmPromptTemplate: defaultLLMPrompt,
-    validationMode: 'strict',
     outputFormat: 'object'
   },
   execute,
   {
-    description: 'Extract structured data from text using rules or generate prompts for LLM extraction. Connect to LLM node for AI-powered extraction.',
-    category: 'processing'
+    description: 'Extract structured data from text using rules or generate prompts for LLM extraction. For LLM mode, connect prompt output to LLM node, then LLM response to Schema Validator node.',
+    category: 'processing',
+    outputMapping: {
+      'data': 'data',
+      'prompt': 'prompt',
+      'needsLLM': 'needsLLM',
+      'originalText': 'originalText',
+      'schema': 'schema'
+    }
   }
 );
 

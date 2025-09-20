@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button.jsx'
 
 import { useStore, selectSidebarOpen, useUIActions } from '../store/index.js'
 
-import NodePaletteContextStyle from './NodePaletteContextStyle.jsx'
+import EnhancedNodePalette from './EnhancedNodePalette'
 
 interface NodeData {
   label?: string;
@@ -255,7 +255,7 @@ const Layout = ({ children, currentView, onViewChange, editingNode, onEditingNod
                   </div>
                 ) : (
                   <div className="flex-1 overflow-hidden">
-                    <NodePaletteContextStyle />
+                    <EnhancedNodePalette />
                   </div>
                 )}
               </div>

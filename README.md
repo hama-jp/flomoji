@@ -53,10 +53,37 @@ That's it! You can start using the application immediately.
   - Built-in templates for JSON filtering, text processing, data aggregation
   - Web Worker isolation for security and performance
   - 5-second timeout protection and memory limits
-- **🌐 Web Integration Nodes**: 
+- **🌐 Web Integration Nodes**:
   - HTTP Request Node: Make API calls with customizable headers and methods
   - Web Search Node: Search Google, Brave, or Bing directly from your workflows
 - **🔄 Control Flow**: If/While conditions, variable management, and scheduled execution
+- **📄 Structured Data Extraction**: Extract and validate JSON-schema compliant data from unstructured text
+  - Rule-based extraction with regex patterns
+  - LLM-based extraction with automatic prompt generation
+  - Schema validation and automatic data repair
+
+### Structured Extraction Workflow Example
+
+The Structured Extraction feature uses a two-node pattern to extract and validate data:
+
+```
+┌──────────────┐     ┌─────────┐     ┌──────────────────┐     ┌────────────┐
+│ Input Node   │────▶│Structured│────▶│   LLM Node      │────▶│   Schema   │
+│ (Text Data)  │     │Extraction│     │ (Process Prompt)│     │ Validator  │
+└──────────────┘     └─────────┘     └──────────────────┘     └────────────┘
+                           │                                          │
+                           ▼                                          ▼
+                     (Direct output                            (Validated JSON)
+                      if rules match)
+```
+
+**How it works:**
+1. **Structured Extraction Node** attempts rule-based extraction first
+2. If rules fail or in LLM mode, it generates a prompt for the LLM
+3. **LLM Node** processes the prompt and returns JSON
+4. **Schema Validator Node** validates and optionally repairs the JSON
+
+This DAG-compliant pattern ensures clean data flow without cycles. See [Structured Extraction Guide](docs/STRUCTURED_EXTRACTION_GUIDE.md) for detailed documentation.
 
 ## 🧑‍💻 For Developers (開発者向け)
 
