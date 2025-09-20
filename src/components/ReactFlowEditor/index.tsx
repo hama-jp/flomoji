@@ -70,7 +70,7 @@ const selectSetExecutionState = (state: ExecutionStore) => state.setExecutionSta
 const selectSetExecutionResult = (state: ExecutionStore) => state.setExecutionResult;
 const selectSetDebugLog = (state: ExecutionStore) => state.setDebugLog;
 
-const ReactFlowEditor = ({ selectedNode, onSelectedNodeChange, onEditingNodeChange }: any) => {
+const ReactFlowEditor = ({ selectedNode, onSelectedNodeChange, onEditingNodeChange, onOpenCopilot }: any) => {
   // nodeTypesとedgeTypesをメモ化して再生成を防ぐ
   const nodeTypes = useMemo(() => ({
     input: InputNodeComponent,
@@ -768,6 +768,7 @@ const ReactFlowEditor = ({ selectedNode, onSelectedNodeChange, onEditingNodeChan
         onStepForward={handleStepForward}
         onStop={handleResetExecution}
         isExecuting={executionState?.running}
+        onOpenCopilot={onOpenCopilot}
       />
       <HandleLabelsProvider showHandleLabels={showHandleLabels}>
         <ReactFlow

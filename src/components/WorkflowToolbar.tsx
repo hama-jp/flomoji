@@ -63,9 +63,10 @@ interface WorkflowToolbarProps {
   onStop: () => void;
   onStepForward: () => void;
   isExecuting: boolean;
+  onOpenCopilot?: () => void;
 }
 
-const WorkflowToolbar = ({ 
+const WorkflowToolbar = ({
   currentWorkflow,
   workflows = [],
   onSave,
@@ -81,7 +82,8 @@ const WorkflowToolbar = ({
   onRunAll,
   onStop,
   onStepForward,
-  isExecuting = false
+  isExecuting = false,
+  onOpenCopilot
 }: WorkflowToolbarProps) => {
   const [isRenaming, setIsRenaming] = useState(false);
   const [newName, setNewName] = useState('');

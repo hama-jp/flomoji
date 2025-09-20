@@ -6,6 +6,7 @@ import ErrorBoundary from './ErrorBoundary.jsx';
 import ReactFlowEditor from './ReactFlowEditor/index.jsx';
 import { DebuggerPanel } from './DebuggerPanel';
 import { DataFlowVisualization } from './DataFlowVisualization';
+import { WorkflowCopilotPanel } from './WorkflowCopilotPanel';
 import type { WorkflowNode } from '../types';
 
 interface WorkflowViewProps {
@@ -13,9 +14,21 @@ interface WorkflowViewProps {
   onSelectedNodeChange: (node: WorkflowNode | null) => void;
   editingNode: WorkflowNode | null;
   onEditingNodeChange: (node: WorkflowNode | null) => void;
+  onOpenCopilot?: () => void;
+  onCloseCopilot?: () => void;
+  isCopilotOpen?: boolean;
 }
 
-const WorkflowView = ({ selectedNode, onSelectedNodeChange, editingNode, onEditingNodeChange }: WorkflowViewProps) => {
+const WorkflowView = ({
+  selectedNode,
+  onSelectedNodeChange,
+  editingNode,
+  onEditingNodeChange,
+  onOpenCopilot,
+  onCloseCopilot,
+  isCopilotOpen = false
+}: WorkflowViewProps) => {
+
   return (
     <ErrorBoundary>
       <ReactFlowProvider>
@@ -25,9 +38,14 @@ const WorkflowView = ({ selectedNode, onSelectedNodeChange, editingNode, onEditi
             onSelectedNodeChange={onSelectedNodeChange}
             editingNode={editingNode}
             onEditingNodeChange={onEditingNodeChange}
+            onOpenCopilot={onOpenCopilot}
           />
           <DataFlowVisualization />
           <DebuggerPanel />
+          <WorkflowCopilotPanel
+            isOpen={isCopilotOpen}
+            onClose={() => onCloseCopilot?.()}
+          />
         </div>
       </ReactFlowProvider>
     </ErrorBoundary>
@@ -35,4 +53,3 @@ const WorkflowView = ({ selectedNode, onSelectedNodeChange, editingNode, onEditi
 };
 
 export default WorkflowView
-

@@ -32,6 +32,8 @@ interface ReactFlowState {
   history: HistoryState[];
   historyIndex: number;
   maxHistorySize: number;
+  previewActive: boolean;
+  previewOriginal: HistoryState | null;
 
   onNodesChange: (changes: NodeChange[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
@@ -43,6 +45,8 @@ interface ReactFlowState {
   deleteSelectedElements: () => void;
   setViewport: (viewport: Viewport) => void;
   loadWorkflow: (id: string) => void;
+  beginPreview: (graph: { nodes: Node[]; edges: Edge[] }) => void;
+  endPreview: (apply: boolean) => void;
 
   // Undo/Redo機能
   undo: () => void;
@@ -67,6 +71,8 @@ const useReactFlowStore = create<ReactFlowState>()(
       history: [],
       historyIndex: -1,
       maxHistorySize: 50,
+      previewActive: false,
+      previewOriginal: null,
 
       onNodesChange: (changes: NodeChange[]) => {
         const currentNodes = get().nodes;
@@ -175,6 +181,8 @@ const useReactFlowStore = create<ReactFlowState>()(
             nodes: Array.isArray(nodes) ? nodes : [],
             edges: Array.isArray(edges) ? edges : [],
             viewport: viewport || { x: 0, y: 0, zoom: 1 },
+            previewActive: false,
+            previewOriginal: null,
           };
 
           set(newState);
@@ -192,8 +200,46 @@ const useReactFlowStore = create<ReactFlowState>()(
             nodes: [],
             edges: [],
             viewport: { x: 0, y: 0, zoom: 1 },
+            previewActive: false,
+            previewOriginal: null,
           });
           get().clearHistory();
+        }
+      },
+      beginPreview: ({ nodes, edges }) => {
+        const state = get();
+        const originalSnapshot: HistoryState = {
+          nodes: state.nodes.map(node => ({ ...node, data: { ...node.data } })),
+          edges: state.edges.map(edge => ({ ...edge })),
+          viewport: state.viewport,
+        };
+
+        set({
+          nodes: nodes.map(node => ({ ...node, data: { ...node.data } })),
+          edges: edges.map(edge => ({ ...edge })),
+          previewActive: true,
+          previewOriginal: state.previewOriginal ?? originalSnapshot,
+        });
+      },
+      endPreview: (apply) => {
+        const state = get();
+        if (!state.previewActive || !state.previewOriginal) {
+          set({ previewActive: false, previewOriginal: null });
+          return;
+        }
+
+        if (apply) {
+          set({ previewActive: false, previewOriginal: null });
+          get().saveToHistory();
+        } else {
+          const { nodes, edges, viewport } = state.previewOriginal;
+          set({
+            nodes: nodes.map(node => ({ ...node, data: { ...node.data } })),
+            edges: edges.map(edge => ({ ...edge })),
+            viewport,
+            previewActive: false,
+            previewOriginal: null,
+          });
         }
       },
 

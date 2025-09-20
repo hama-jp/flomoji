@@ -39,15 +39,19 @@ class WorkflowManagerService {
   private _initialized: boolean = false;
 
   /**
-   * Initialize the service and load sample workflows if needed
+   * Initialize the service and create an empty workflow if needed
    */
   async initialize(): Promise<void> {
     if (this._initialized) return;
-    
+
     const workflows = this.getWorkflows();
     if (Object.keys(workflows).length === 0) {
-      logger.info('Setting up initial workflows...');
-      await this._loadInitialSamples();
+      logger.info('Creating initial empty workflow...');
+      // Create a single empty workflow instead of loading samples
+      const emptyWorkflow = this.createNewWorkflow('Untitled Workflow');
+      this.saveWorkflow(emptyWorkflow);
+      this.setCurrentWorkflowId(emptyWorkflow.id);
+      logger.info('Created empty workflow');
     }
     this._initialized = true;
   }

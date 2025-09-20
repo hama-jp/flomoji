@@ -28,7 +28,10 @@ export type NodeType =
   | 'web_api'
   | 'timestamp'
   | 'structured_extraction'
-  | 'schema_validator';
+  | 'schema_validator'
+  | 'json_transform'
+  | 'array_operations'
+  | 'data_transform';
 
 /**
  * Execution context interface for node execution
