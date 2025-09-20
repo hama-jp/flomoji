@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useLayoutEffect } from 'react';
 
 import {
   Save,
@@ -91,13 +91,34 @@ const WorkflowToolbar = ({
   const renameInputRef = useRef<HTMLInputElement>(null);
   const SNAP_TOP = 8; // px offset from very top when snapped
   const SNAP_THRESHOLD = 40; // distance from top to trigger magnet
+  const EDGE_PADDING = 20;
+  const DEFAULT_WIDTH = 420;
+
+  const dragRef = useRef<HTMLDivElement>(null);
+  const [toolbarWidth, setToolbarWidth] = useState(DEFAULT_WIDTH);
+
+  const computeMaxX = (width: number = toolbarWidth) => Math.max(EDGE_PADDING, window.innerWidth - width - EDGE_PADDING);
 
   const [position, setPosition] = useState({
-    x: Math.max(20, window.innerWidth - 420),
+    x: computeMaxX(DEFAULT_WIDTH),
     y: SNAP_TOP
   });
   const [isDragging, setIsDragging] = useState(false);
-  const dragRef = useRef<HTMLDivElement>(null);
+ 
+  useLayoutEffect(() => {
+    const measureAndSnap = () => {
+      const width = dragRef.current?.offsetWidth || DEFAULT_WIDTH;
+      setToolbarWidth(width);
+      setPosition(prev => ({
+        x: Math.max(EDGE_PADDING, Math.min(window.innerWidth - width - EDGE_PADDING, prev.x)),
+        y: prev.y <= SNAP_THRESHOLD ? SNAP_TOP : Math.min(prev.y, window.innerHeight - 80)
+      }));
+    };
+
+    measureAndSnap();
+    window.addEventListener('resize', measureAndSnap);
+    return () => window.removeEventListener('resize', measureAndSnap);
+  }, []);
 
   // Snapping configuration (keep draggable but gently magnetise to top band)
 
@@ -222,10 +243,13 @@ const WorkflowToolbar = ({
     const handleMouseMove = (e: MouseEvent) => {
       e.preventDefault();
 
+      const width = dragRef.current?.offsetWidth || toolbarWidth;
+      const maxX = computeMaxX(width);
+
       let newX = e.clientX - offsetX;
       let newY = e.clientY - offsetY;
 
-      newX = Math.max(0, Math.min(window.innerWidth - 400, newX));
+      newX = Math.max(EDGE_PADDING, Math.min(maxX, newX));
       newY = Math.max(0, Math.min(window.innerHeight - 80, newY));
 
       if (newY <= SNAP_THRESHOLD) {
@@ -242,8 +266,9 @@ const WorkflowToolbar = ({
       // Snap to top if released near upper edge
       setPosition(prev => {
         if (prev.y <= SNAP_THRESHOLD) {
+          const width = dragRef.current?.offsetWidth || toolbarWidth;
           return {
-            x: Math.max(0, Math.min(window.innerWidth - 400, prev.x)),
+            x: Math.max(EDGE_PADDING, Math.min(computeMaxX(width), prev.x)),
             y: SNAP_TOP
           };
         }
