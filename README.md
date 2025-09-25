@@ -4,7 +4,7 @@
 
 flomoji enables AI conversations and workflow automation without complex setup. Supporting various AI providers including OpenAI, Anthropic, and local LLMs, it streamlines your work through prompt chaining and multi-step processing.
 
-**ブラウザだけで動く、軽量LLMエージェント開発ツール**
+**ブラウザ（とAPIキー）だけで動く、軽量LLMエージェント開発ツール**
 
 flomojiは、複雑な環境構築なしにAIとの対話やワークフロー自動化を実現する軽量ツールです。 OpenAI、Anthropic、ローカルLLMなど様々なAIプロバイダーに対応し、プロンプトチェーンによる多段階処理で作業を効率化できます。
 
