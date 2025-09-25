@@ -24,6 +24,9 @@ interface ExecutionStep {
   outputs: Record<string, any>;
   error?: string;
   duration: number;
+  status?: 'success' | 'error' | 'skipped';
+  startTime?: number;
+  endTime?: number;
 }
 
 interface DataFlowEdge {

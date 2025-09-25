@@ -52,7 +52,11 @@ export const IfNode = createNodeDefinition(
   executeIfNode, // 実行メソッド（プレースホルダー）
   {
     description: 'Branch the workflow based on conditions. When the condition is true, input flows to the true port; when false, flows to the false port. Supports LLM evaluation or variable comparison conditions.',
-    category: 'control-flow'
+    category: 'control-flow',
+    outputMapping: {
+      'true': 'trueOutput',
+      'false': 'falseOutput'
+    }
   }
 );
 

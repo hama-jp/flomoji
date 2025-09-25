@@ -15,7 +15,7 @@ import { useStore as useUIStore } from '../../store';
 import useExecutionStore, { ExecutionStore } from '../../store/executionStore';
 import useReactFlowStore from '../../store/reactFlowStore';
 import ExecutionOutputWindow from '../ExecutionOutputWindow';
-import { nodeTypes as nodeDefinitions } from '../nodes/index.js';
+import { nodeTypes as nodeDefinitions } from '../nodes';
 import WorkflowToolbar from '../WorkflowToolbar';
 
 import ContextMenu from './ContextMenu';
@@ -35,6 +35,8 @@ import VariableSetNodeComponent from './nodes/VariableSetNodeComponent';
 import WebSearchNodeComponent from './nodes/WebSearchNodeComponent';
 import WebAPINodeComponent from './nodes/WebAPINodeComponent';
 import WhileNodeComponent from './nodes/WhileNodeComponent';
+import StructuredExtractionNodeComponent from './nodes/StructuredExtractionNodeComponent';
+import SchemaValidatorNodeComponent from './nodes/SchemaValidatorNodeComponent';
 
 import { HandleLabelsProvider } from '../../contexts/HandleLabelsContext';
 import { Workflow, WorkflowNode, WorkflowEdge } from '../../types';
@@ -68,36 +70,40 @@ const selectSetExecutionState = (state: ExecutionStore) => state.setExecutionSta
 const selectSetExecutionResult = (state: ExecutionStore) => state.setExecutionResult;
 const selectSetDebugLog = (state: ExecutionStore) => state.setDebugLog;
 
-const ReactFlowEditor = ({ selectedNode, onSelectedNodeChange, onEditingNodeChange }: any) => {
-  // nodeTypesとedgeTypesをメモ化して再生成を防ぐ
-  const nodeTypes = useMemo(() => ({
-    input: InputNodeComponent,
-    output: OutputNodeComponent,
-    timestamp: TimestampNodeComponent,
-    llm: LLMNodeComponent,
-    if: IfNodeComponent,
-    while: WhileNodeComponent,
-    text: TextNodeComponent,
-    text_combiner: TextCombinerNodeComponent,
-    variable_set: VariableSetNodeComponent,
-    schedule: ScheduleNodeComponent,
-    http_request: HTTPRequestNodeComponent,
-    web_search: WebSearchNodeComponent,
-    code_execution: CodeExecutionNodeComponent,
-    web_api: WebAPINodeComponent,
-    // 他の未実装ノードタイプはCustomNodeで処理
-  }), []); // 空の依存配列（静的な定義）
+// nodeTypesとedgeTypesをコンポーネント外で定義して完全に静的にする
+const nodeTypes = {
+  input: InputNodeComponent,
+  output: OutputNodeComponent,
+  timestamp: TimestampNodeComponent,
+  llm: LLMNodeComponent,
+  if: IfNodeComponent,
+  while: WhileNodeComponent,
+  text: TextNodeComponent,
+  text_combiner: TextCombinerNodeComponent,
+  variable_set: VariableSetNodeComponent,
+  schedule: ScheduleNodeComponent,
+  http_request: HTTPRequestNodeComponent,
+  web_search: WebSearchNodeComponent,
+  code_execution: CodeExecutionNodeComponent,
+  web_api: WebAPINodeComponent,
+  structured_extraction: StructuredExtractionNodeComponent,
+  schema_validator: SchemaValidatorNodeComponent,
+  // 他の未実装ノードタイプはCustomNodeで処理
+};
 
-  const edgeTypes = useMemo(() => ({
-    custom: CustomEdge,
-  }), []); // 空の依存配列（静的な定義）
+const edgeTypes = {
+  custom: CustomEdge,
+};
+
+const ReactFlowEditor = ({ selectedNode, onSelectedNodeChange, onEditingNodeChange, onOpenCopilot }: any) => {
   // 個別のセレクターを使用してZustandストアから値を取得
   const rawNodes = useReactFlowStore(selectNodes);
   const rawEdges = useReactFlowStore(selectEdges);
   const nodes = useMemo(() => {
     const result = Array.isArray(rawNodes) ? rawNodes : [];
+    // 初期状態では空なのは正常なので、デバッグレベルを下げる
     if (result.length === 0) {
-      console.log('⚠️ ReactFlowEditor - nodesが空です, rawNodes:', rawNodes);
+      console.debug('ReactFlowEditor - 初期化中: ノードが空です');
     } else {
       console.log('📊 ReactFlowEditor - nodes loaded:', result.length, 'items');
     }
@@ -105,7 +111,9 @@ const ReactFlowEditor = ({ selectedNode, onSelectedNodeChange, onEditingNodeChan
   }, [rawNodes]);
   const edges = useMemo(() => {
     const result = Array.isArray(rawEdges) ? rawEdges : [];
-    console.log('🔗 ReactFlowEditor - edges:', result.length, 'connections');
+    if (result.length > 0) {
+      console.log('🔗 ReactFlowEditor - edges:', result.length, 'connections');
+    }
     return result;
   }, [rawEdges]);
   const viewport = useReactFlowStore(selectViewport);
@@ -739,11 +747,7 @@ const ReactFlowEditor = ({ selectedNode, onSelectedNodeChange, onEditingNodeChan
   //   setViewport(newViewport);
   // }, [setViewport]);
 
-  console.log('ReactFlowEditor return 前 - コンポーネントは正常に動作中');
-  
-  if (nodes.length === 0) {
-    console.warn('ReactFlowEditor - nodesが空です');
-  }
+  // デバッグログを削除（不要な出力を減らす）
   
   return (
     <div style={{ width: '100%', height: '100%' }}>
@@ -764,6 +768,7 @@ const ReactFlowEditor = ({ selectedNode, onSelectedNodeChange, onEditingNodeChan
         onStepForward={handleStepForward}
         onStop={handleResetExecution}
         isExecuting={executionState?.running}
+        onOpenCopilot={onOpenCopilot}
       />
       <HandleLabelsProvider showHandleLabels={showHandleLabels}>
         <ReactFlow

@@ -1,20 +1,25 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useLayoutEffect } from 'react';
 
-import { 
-  Save, 
-  FolderOpen, 
-  FilePlus, 
-  Download, 
-  Upload, 
-  Edit3, 
-  Check, 
-  X, 
+import {
+  Save,
+  FolderOpen,
+  FilePlus,
+  Download,
+  Upload,
+  Edit3,
+  Check,
+  X,
   MoreHorizontal,
   Trash2,
   Copy,
   Play,
   Square,
-  SkipForward
+  SkipForward,
+  Bug,
+  Pause,
+  RotateCcw,
+  ChevronRight,
+  Gauge
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -39,6 +44,8 @@ import {
 import { Input } from '@/components/ui/input';
 
 import { Workflow } from '@/types';
+import { useDebuggerStore } from '../store/debuggerStore';
+import { cn } from '../lib/utils';
 
 interface WorkflowToolbarProps {
   currentWorkflow: Workflow | null;
@@ -56,9 +63,10 @@ interface WorkflowToolbarProps {
   onStop: () => void;
   onStepForward: () => void;
   isExecuting: boolean;
+  onOpenCopilot?: () => void;
 }
 
-const WorkflowToolbar = ({ 
+const WorkflowToolbar = ({
   currentWorkflow,
   workflows = [],
   onSave,
@@ -74,7 +82,8 @@ const WorkflowToolbar = ({
   onRunAll,
   onStop,
   onStepForward,
-  isExecuting = false
+  isExecuting = false,
+  onOpenCopilot
 }: WorkflowToolbarProps) => {
   const [isRenaming, setIsRenaming] = useState(false);
   const [newName, setNewName] = useState('');
@@ -82,9 +91,67 @@ const WorkflowToolbar = ({
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
-  const [position, setPosition] = useState({ x: window.innerWidth - 800, y: 20 });
-  const [isDragging, setIsDragging] = useState(false);
+  const SNAP_TOP = 8; // px offset from very top when snapped
+  const SNAP_THRESHOLD = 40; // distance from top to trigger magnet
+  const EDGE_PADDING = 20;
+  const DEFAULT_WIDTH = 420;
+
   const dragRef = useRef<HTMLDivElement>(null);
+  const [toolbarWidth, setToolbarWidth] = useState(DEFAULT_WIDTH);
+
+  const computeMaxX = (width: number = toolbarWidth) => Math.max(EDGE_PADDING, window.innerWidth - width - EDGE_PADDING);
+
+  const [position, setPosition] = useState({
+    x: computeMaxX(DEFAULT_WIDTH),
+    y: SNAP_TOP
+  });
+  const [isDragging, setIsDragging] = useState(false);
+ 
+  useLayoutEffect(() => {
+    const measureAndSnap = () => {
+      const width = dragRef.current?.offsetWidth || DEFAULT_WIDTH;
+      setToolbarWidth(width);
+      setPosition(prev => ({
+        x: Math.max(EDGE_PADDING, Math.min(window.innerWidth - width - EDGE_PADDING, prev.x)),
+        y: prev.y <= SNAP_THRESHOLD ? SNAP_TOP : Math.min(prev.y, window.innerHeight - 80)
+      }));
+    };
+
+    measureAndSnap();
+    window.addEventListener('resize', measureAndSnap);
+    return () => window.removeEventListener('resize', measureAndSnap);
+  }, []);
+
+  // Snapping configuration (keep draggable but gently magnetise to top band)
+
+  // Debugger state
+  const {
+    debugMode,
+    setDebugMode,
+    executionStatus,
+    setExecutionStatus,
+    executionSpeed,
+    setExecutionSpeed,
+    clearExecutionHistory,
+    stepForward: debugStepForward,
+    abortExecution
+  } = useDebuggerStore();
+
+  // Map speed preset strings to numeric delays (in milliseconds)
+  const speedPresets = {
+    slow: 1000,    // 1 second delay
+    normal: 500,   // 500ms delay
+    fast: 100,     // 100ms delay
+    instant: 0     // No delay
+  };
+
+  // Get the current speed preset from numeric value
+  const getCurrentSpeedPreset = () => {
+    if (executionSpeed >= 1000) return 'slow';
+    if (executionSpeed >= 500) return 'normal';
+    if (executionSpeed >= 100) return 'fast';
+    return 'instant';
+  };
 
   const handleStartRename = () => {
     setNewName(currentWorkflow?.name || '');
@@ -176,16 +243,39 @@ const WorkflowToolbar = ({
     const offsetY = e.clientY - rect.top;
     
     const handleMouseMove = (e: MouseEvent) => {
-      setPosition({
-        x: Math.max(0, Math.min(window.innerWidth - 400, e.clientX - offsetX)),
-        y: Math.max(0, Math.min(window.innerHeight - 80, e.clientY - offsetY))
-      });
+      e.preventDefault();
+
+      const width = dragRef.current?.offsetWidth || toolbarWidth;
+      const maxX = computeMaxX(width);
+
+      let newX = e.clientX - offsetX;
+      let newY = e.clientY - offsetY;
+
+      newX = Math.max(EDGE_PADDING, Math.min(maxX, newX));
+      newY = Math.max(0, Math.min(window.innerHeight - 80, newY));
+
+      if (newY <= SNAP_THRESHOLD) {
+        newY = SNAP_TOP;
+      }
+
+      setPosition({ x: newX, y: newY });
     };
     
     const handleMouseUp = () => {
       setIsDragging(false);
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
+      // Snap to top if released near upper edge
+      setPosition(prev => {
+        if (prev.y <= SNAP_THRESHOLD) {
+          const width = dragRef.current?.offsetWidth || toolbarWidth;
+          return {
+            x: Math.max(EDGE_PADDING, Math.min(computeMaxX(width), prev.x)),
+            y: SNAP_TOP
+          };
+        }
+        return prev;
+      });
     };
     
     document.addEventListener('mousemove', handleMouseMove);
@@ -379,37 +469,157 @@ const WorkflowToolbar = ({
       <div className="w-px h-6 bg-gray-300" />
 
       {/* Execution Controls */}
-      <div className="flex items-center gap-1 cursor-auto">
+      <div className="flex items-center gap-2 cursor-auto">
+        {/* Debug Mode Toggle */}
         <Button
-          size={'sm' as const} 
-          onClick={onRunAll}
-          disabled={isExecuting}
-          className="bg-green-600 hover:bg-green-700 text-white"
+          size={'sm' as const}
+          variant={debugMode !== 'off' ? 'default' : 'outline'}
+          onClick={() => setDebugMode(debugMode === 'off' ? 'step' : 'off')}
+          className={cn(
+            "transition-all",
+            debugMode !== 'off' && "bg-orange-600 hover:bg-orange-700"
+          )}
+          title={debugMode === 'off' ? "Enable Debug Mode" : "Disable Debug Mode"}
         >
-          <Play className="h-4 w-4 mr-1.5" />
-          Run
+          <Bug className="h-4 w-4" />
         </Button>
-        
-        <Button
-          size={'sm' as const} 
-          variant={'outline' as const}
-          onClick={onStop}
-          disabled={!isExecuting}
-        >
-          <Square className="h-4 w-4 mr-1.5" />
-          Stop
-        </Button>
-        
-        <Button
-          size={'sm' as const} 
-          variant={'outline' as const}
-          onClick={onStepForward}
-          disabled={isExecuting}
-        >
-          <SkipForward className="h-4 w-4 mr-1.5" />
-          Step
-        </Button>
-        
+
+        {debugMode !== 'off' ? (
+          <>
+            {/* Debug Controls */}
+            <div className="flex items-center gap-1 px-2 py-1 bg-orange-50 rounded-lg">
+              {executionStatus !== 'running' ? (
+                <Button
+                  size={'sm' as const}
+                  variant={'ghost' as const}
+                  onClick={() => {
+                    setExecutionStatus('running');
+                    onRunAll?.();
+                  }}
+                  disabled={!currentWorkflow}
+                  className="h-7 text-green-600 hover:bg-green-100"
+                  title="Play"
+                >
+                  <Play className="h-4 w-4" />
+                </Button>
+              ) : (
+                <Button
+                  size={'sm' as const}
+                  variant={'ghost' as const}
+                  onClick={() => setExecutionStatus('paused')}
+                  className="h-7 text-orange-600 hover:bg-orange-100"
+                  title="Pause"
+                >
+                  <Pause className="h-4 w-4" />
+                </Button>
+              )}
+
+              <Button
+                size={'sm' as const}
+                variant={'ghost' as const}
+                onClick={() => {
+                  if (executionStatus === 'paused') {
+                    debugStepForward();
+                    onStepForward?.();
+                  }
+                }}
+                disabled={executionStatus !== 'paused'}
+                className="h-7 text-blue-600 hover:bg-blue-100 disabled:text-gray-300"
+                title="Step Forward"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+
+              <Button
+                size={'sm' as const}
+                variant={'ghost' as const}
+                onClick={() => {
+                  abortExecution();
+                  clearExecutionHistory();
+                  setExecutionStatus('idle');
+                  onStop?.();
+                }}
+                className="h-7 text-red-600 hover:bg-red-100"
+                title="Reset"
+              >
+                <RotateCcw className="h-4 w-4" />
+              </Button>
+
+              <div className="w-px h-5 bg-gray-300 mx-1" />
+
+              {/* Speed Control */}
+              <div className="flex items-center gap-1">
+                <Gauge className="h-4 w-4 text-gray-500" />
+                <select
+                  value={getCurrentSpeedPreset()}
+                  onChange={(e) => {
+                    const preset = e.target.value as keyof typeof speedPresets;
+                    setExecutionSpeed(speedPresets[preset]);
+                  }}
+                  className="text-xs px-1 py-0.5 border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-orange-500"
+                >
+                  <option value="slow">Slow</option>
+                  <option value="normal">Normal</option>
+                  <option value="fast">Fast</option>
+                  <option value="instant">Instant</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Execution Status Indicator */}
+            {executionStatus !== 'idle' && (
+              <Badge
+                className={cn(
+                  "text-xs",
+                  executionStatus === 'running' && "bg-green-100 text-green-700",
+                  executionStatus === 'paused' && "bg-orange-100 text-orange-700",
+                  executionStatus === 'completed' && "bg-blue-100 text-blue-700"
+                )}
+              >
+                <div className={cn(
+                  "w-2 h-2 rounded-full mr-1",
+                  executionStatus === 'running' && "bg-green-500 animate-pulse",
+                  executionStatus === 'paused' && "bg-orange-500",
+                  executionStatus === 'completed' && "bg-blue-500"
+                )} />
+                {executionStatus}
+              </Badge>
+            )}
+          </>
+        ) : (
+          /* Normal Execution Controls */
+          <>
+            <Button
+              size={'sm' as const}
+              onClick={onRunAll}
+              disabled={isExecuting}
+              className="bg-green-600 hover:bg-green-700 text-white"
+            >
+              <Play className="h-4 w-4 mr-1.5" />
+              Run
+            </Button>
+
+            <Button
+              size={'sm' as const}
+              variant={'outline' as const}
+              onClick={onStop}
+              disabled={!isExecuting}
+            >
+              <Square className="h-4 w-4 mr-1.5" />
+              Stop
+            </Button>
+
+            <Button
+              size={'sm' as const}
+              variant={'outline' as const}
+              onClick={onStepForward}
+              disabled={isExecuting}
+            >
+              <SkipForward className="h-4 w-4 mr-1.5" />
+              Step
+            </Button>
+          </>
+        )}
       </div>
 
 

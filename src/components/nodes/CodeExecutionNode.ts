@@ -3,7 +3,7 @@
  * JavaScriptコードを安全に実行するノード
  */
 
-import codeExecutionService from '../../utils/codeExecutionService.js';
+import codeExecutionService from '../../utils/codeExecutionService';
 import { createNodeDefinition } from './types';
 import type { WorkflowNode, NodeInputs, INodeExecutionContext, NodeOutput } from '../../types';
 
@@ -284,7 +284,11 @@ export const CodeExecutionNode = createNodeDefinition(
   executeCodeNode,
   {
     description: 'Execute JavaScript code safely in an isolated environment. Access inputs via input1/2/3 and workflow variables via variables object.',
-    category: 'processing'
+    category: 'processing',
+    outputMapping: {
+      output: 'output',
+      error: 'error'
+    }
   }
 );
 

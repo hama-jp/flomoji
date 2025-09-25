@@ -55,6 +55,9 @@ coverage/
 .vite/
 .turbo/
 .next/
+playwright-report/
+blob-report/
+test-results/
 
 # Temporary folders
 tmp/

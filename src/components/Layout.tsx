@@ -1,13 +1,13 @@
 
 import React, { useState, useEffect, useCallback } from 'react'
 
-import { Menu, Settings, MessageSquare, Workflow, Database, X } from 'lucide-react'
+import { Menu, Settings, MessageSquare, Workflow, Database, X, Sparkles } from 'lucide-react'
 
-import { Button } from '@/components/ui/button.jsx'
+import { Button } from '@/components/ui/button'
 
-import { useStore, selectSidebarOpen, useUIActions } from '../store/index.js'
+import { useStore, selectSidebarOpen, useUIActions } from '../store'
 
-import NodePaletteContextStyle from './NodePaletteContextStyle.jsx'
+import EnhancedNodePalette from './EnhancedNodePalette'
 
 interface NodeData {
   label?: string;
@@ -208,9 +208,10 @@ interface LayoutProps {
   onViewChange: (view: string) => void;
   editingNode: any;
   onEditingNodeChange: (node: any) => void;
+  onOpenCopilot?: () => void;
 }
 
-const Layout = ({ children, currentView, onViewChange, editingNode, onEditingNodeChange }: LayoutProps) => {
+const Layout = ({ children, currentView, onViewChange, editingNode, onEditingNodeChange, onOpenCopilot }: LayoutProps) => {
   const sidebarOpen = useStore(selectSidebarOpen)
   const { setSidebarOpen }: any = useUIActions()
 
@@ -229,7 +230,21 @@ const Layout = ({ children, currentView, onViewChange, editingNode, onEditingNod
           <>
             <div className="p-4 border-b">
               <div className="flex items-center justify-between">
-                <h1 className="text-xl font-bold text-gray-800">🌊 flomoji</h1>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-xl font-bold text-gray-800">🌊 flomoji</h1>
+                  {currentView === 'workflow' && onOpenCopilot && (
+                    <Button
+                      variant={'default'}
+                      size={'sm'}
+                      onClick={onOpenCopilot}
+                      className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white shadow-md"
+                      title="Open Workflow Copilot - AI Assistant"
+                    >
+                      <Sparkles className="h-4 w-4 mr-1" />
+                      Copilot
+                    </Button>
+                  )}
+                </div>
                 <Button variant={'ghost'} size={'sm'} onClick={() => setSidebarOpen(false)} className="md:hidden"><X className="h-4 w-4" /></Button>
               </div>
             </div>
@@ -255,7 +270,7 @@ const Layout = ({ children, currentView, onViewChange, editingNode, onEditingNod
                   </div>
                 ) : (
                   <div className="flex-1 overflow-hidden">
-                    <NodePaletteContextStyle />
+                    <EnhancedNodePalette />
                   </div>
                 )}
               </div>

@@ -63,6 +63,7 @@ export interface ExtendedNodeDefinition extends NodeDefinition {
   textColor: string;
   description?: string;
   category?: string;
+  outputMapping?: Record<string, string>; // Maps output handle names to result object properties
 }
 
 /**
@@ -80,6 +81,7 @@ export type NodeExecuteFunction = (
 export interface CreateNodeOptions {
   description?: string;
   category?: string;
+  outputMapping?: Record<string, string>; // Maps output handle names to result object properties
 }
 
 /**
@@ -126,6 +128,7 @@ export function createNodeDefinitionNew(
     defaultData: defaultData || {},
     execute,
     category: options.category || 'general', // テストとの互換性のため
+    outputMapping: options.outputMapping,
     metadata: {
       description: options.description || '',
       category: options.category || 'general'

@@ -6,14 +6,18 @@
 import type { ExtendedNodeDefinition } from './types';
 
 // ノード定義をインポート
+import ArrayOperationsNode from './ArrayOperationsNode';
 import CodeExecutionNode from './CodeExecutionNode';
+import DataTransformNode from './DataTransformNode';
 import HTTPRequestNode from './HTTPRequestNode';
 import IfNode from './IfNode';
 import InputNode from './InputNode';
+import JSONTransformNode from './JSONTransformNode';
 import LLMNode from './LLMNode';
 import OutputNode from './OutputNode';
 import ScheduleNode from './ScheduleNode';
 import StructuredExtractionNode from './StructuredExtractionNode';
+import StructuredExtractionValidatorNode from './StructuredExtractionValidatorNode';
 import TextCombinerNode from './TextCombinerNode';
 import TimestampNode from './TimestampNode';
 import VariableSetNode from './VariableSetNode';
@@ -31,6 +35,10 @@ export const nodeTypes: Record<string, ExtendedNodeDefinition> = {
   llm: LLMNode,
   text_combiner: TextCombinerNode,
   structured_extraction: StructuredExtractionNode,
+  schema_validator: StructuredExtractionValidatorNode,
+  json_transform: JSONTransformNode,
+  array_operations: ArrayOperationsNode,
+  data_transform: DataTransformNode,
   if: IfNode,
   while: WhileNode,
   variable_set: VariableSetNode,
@@ -61,6 +69,10 @@ export const nodesByCategory: Record<string, { name: string; nodes: Record<strin
       llm: LLMNode,
       text_combiner: TextCombinerNode,
       structured_extraction: StructuredExtractionNode,
+      schema_validator: StructuredExtractionValidatorNode,
+      json_transform: JSONTransformNode,
+      array_operations: ArrayOperationsNode,
+      data_transform: DataTransformNode,
       code_execution: CodeExecutionNode
     }
   },

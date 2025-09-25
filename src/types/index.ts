@@ -12,11 +12,11 @@
 /**
  * Available node types in the workflow system
  */
-export type NodeType = 
-  | 'input' 
-  | 'output' 
-  | 'llm' 
-  | 'if' 
+export type NodeType =
+  | 'input'
+  | 'output'
+  | 'llm'
+  | 'if'
   | 'while'
   | 'text'
   | 'text_combiner'
@@ -26,7 +26,12 @@ export type NodeType =
   | 'web_search'
   | 'code_execution'
   | 'web_api'
-  | 'timestamp';
+  | 'timestamp'
+  | 'structured_extraction'
+  | 'schema_validator'
+  | 'json_transform'
+  | 'array_operations'
+  | 'data_transform';
 
 /**
  * Execution context interface for node execution

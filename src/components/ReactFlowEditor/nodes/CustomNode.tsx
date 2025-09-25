@@ -2,6 +2,7 @@ import React, { memo, ReactNode } from 'react';
 import { Handle, Position } from '@xyflow/react';
 import { useHandleLabels } from '../../../contexts/HandleLabelsContext';
 import useExecutionStore, { ExecutionStore } from '../../../store/executionStore';
+import { NodeDebugOverlay } from '../../NodeDebugOverlay';
 
 interface HandleDefinition {
   id: string;
@@ -59,21 +60,14 @@ const CustomNode = ({ data, children, id }: CustomNodeProps) => {
   const maxHandles = Math.max(finalInputs.length, finalOutputs.length);
   const minHeightClass = maxHandles >= 4 ? 'min-h-48' : 'min-h-32';
 
-  let borderClass = 'border-gray-300';
-  let shadowClass = 'shadow-md';
-  let animationClass = '';
-
-  if (isCurrentlyExecuting) {
-    borderClass = 'border-blue-500';
-    shadowClass = 'shadow-blue-200 shadow-lg';
-    animationClass = 'animate-pulse';
-  } else if (isExecuted) {
-    borderClass = 'border-green-500';
-    shadowClass = 'shadow-green-200 shadow-lg';
-  }
+  // Remove old execution styling as it's now handled by the overlay
+  const borderClass = 'border-gray-300';
+  const shadowClass = 'shadow-md';
 
   return (
-    <div className={`relative bg-white border-2 ${borderClass} rounded-lg ${shadowClass} ${animationClass} w-fit min-w-64 ${minHeightClass} transition-all duration-300 overflow-visible`}>
+    <div className={`relative bg-white border-2 ${borderClass} rounded-lg ${shadowClass} w-fit min-w-64 ${minHeightClass} transition-all duration-300 overflow-visible`}>
+      {/* Debug overlay */}
+      <NodeDebugOverlay nodeId={id} isExecuting={isRunning} />
       {finalInputs.map((input: HandleDefinition, index: number) => (
         <React.Fragment key={input.id || `input-${index}`}>
           <Handle

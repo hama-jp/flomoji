@@ -259,7 +259,12 @@ export const WebSearchNode = createNodeDefinition(
   executeWebSearchNode,
   {
     description: 'Search the web using Google, Brave, or Bing APIs. Returns normalized results.',
-    category: 'web-integration'
+    category: 'web-integration',
+    outputMapping: {
+      results: 'results',
+      metadata: 'metadata',
+      error: 'error'
+    }
   }
 );
 

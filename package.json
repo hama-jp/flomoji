@@ -31,6 +31,7 @@
     "test": "vitest --run",
     "test:coverage": "vitest --coverage",
     "test:ui": "vitest --ui",
+    "test:e2e": "playwright test",
     "security:audit": "pnpm audit",
     "preview": "vite preview",
     "deploy": "pnpm run build && gh-pages -d dist"
@@ -64,8 +65,10 @@
     "@radix-ui/react-toggle-group": "^1.1.11",
     "@radix-ui/react-tooltip": "^1.2.8",
     "@tailwindcss/vite": "^4.1.12",
+    "@types/uuid": "^11.0.0",
     "@xyflow/react": "^12.8.4",
     "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
@@ -90,12 +93,14 @@
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.3.1",
     "tailwindcss": "^4.1.12",
+    "uuid": "^13.0.0",
     "vaul": "^1.1.2",
     "zod": "^3.25.76",
     "zustand": "^5.0.8"
   },
   "devDependencies": {
     "@eslint/js": "^9.34.0",
+    "@playwright/test": "^1.55.0",
     "@types/jexl": "^2.3.4",
     "@types/node": "^24.3.1",
     "@types/react": "^19.1.11",

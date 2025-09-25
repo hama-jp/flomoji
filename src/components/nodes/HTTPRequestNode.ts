@@ -91,7 +91,7 @@ export async function executeHTTPRequestNode(node: WorkflowNode, inputs: NodeInp
       return {
         response: null,
         error: `HTTP ${response.status}: ${response.statusText}`,
-        details: responseData
+        metadata: responseData
       };
     }
     
@@ -197,7 +197,12 @@ export const HTTPRequestNode = createNodeDefinition(
   executeHTTPRequestNode,
   {
     description: 'Send HTTP requests to any API endpoint. Supports templates for common APIs.',
-    category: 'web-integration'
+    category: 'web-integration',
+    outputMapping: {
+      response: 'response',
+      error: 'error',
+      metadata: 'metadata'
+    }
   }
 );
 

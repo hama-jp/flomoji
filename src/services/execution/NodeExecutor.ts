@@ -40,10 +40,20 @@ export class NodeExecutor {
     
     try {
       const result = await this.executeNodeType(node, inputs, nodes, connections);
-      
+
       this.context.addLog('success', `ノード実行完了: ${node.data.label || node.type}`, node.id, { result });
-      this.context.setNodeResult(node.id, result);
-      
+
+      // For multi-output nodes, store the result in a special format
+      // to enable per-handle output routing
+      if (this.isMultiOutputNode(node.type) && result && typeof result === 'object') {
+        this.context.setNodeResult(node.id, {
+          __multiOutput: true,
+          ...result
+        });
+      } else {
+        this.context.setNodeResult(node.id, result);
+      }
+
       return result;
     } catch (error: any) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -52,6 +62,29 @@ export class NodeExecutor {
       });
       throw error;
     }
+  }
+
+  /**
+   * Check if node type has multiple outputs
+   */
+  private isMultiOutputNode(type: string): boolean {
+    // Check node definition first
+    const nodeDefinition = this.nodeTypes[type];
+
+    // A node is multi-output if it has outputMapping defined or has more than 1 output
+    if (nodeDefinition) {
+      if (nodeDefinition.outputMapping) {
+        return true;
+      }
+      if (nodeDefinition.outputs && nodeDefinition.outputs.length > 1) {
+        return true;
+      }
+    }
+
+    // Fallback to hardcoded list for backward compatibility
+    return type === 'structured_extraction' ||
+           type === 'schema_validator' ||
+           type === 'if';
   }
 
   /**
@@ -255,10 +288,143 @@ export class NodeExecutor {
       
       if (sourceNodeId) {
         const sourceValue = this.context.getNodeResult(sourceNodeId);
-        
-        // Handle special IF node outputs
         const sourceNode = nodes.find(n => n.id === sourceNodeId);
-        if (sourceNode?.type === 'if' && sourceValue) {
+
+        // Check if this is a multi-output node result
+        if (sourceValue && sourceValue.__multiOutput) {
+          const sourceHandle = conn.sourceHandle || String(conn.from?.portIndex || 0);
+
+          // Get output mapping from node definition (if provided)
+          let outputFieldMap: Record<string, string> = {};
+          const nodeDefinition = sourceNode ? this.nodeTypes[sourceNode.type] : null;
+
+          if (nodeDefinition?.outputMapping) {
+            outputFieldMap = { ...nodeDefinition.outputMapping };
+
+            if (nodeDefinition.outputs) {
+              nodeDefinition.outputs.forEach((outputName: string, index: number) => {
+                const mapped = nodeDefinition.outputMapping?.[outputName] || outputName;
+                outputFieldMap[String(index)] = mapped;
+              });
+            }
+          } else if (nodeDefinition?.outputs) {
+            // Default mapping: handle names map to themselves
+            nodeDefinition.outputs.forEach((outputName: string, index: number) => {
+              outputFieldMap[String(index)] = outputName;
+              outputFieldMap[outputName] = outputName;
+            });
+          }
+
+          // Fallback for legacy nodes without definitions
+          if (Object.keys(outputFieldMap).length === 0 && sourceNode?.type === 'if') {
+            outputFieldMap = {
+              '0': 'trueOutput',
+              '1': 'falseOutput',
+              'true': 'trueOutput',
+              'false': 'falseOutput'
+            };
+          }
+
+          if (Object.keys(outputFieldMap).length === 0 && sourceNode) {
+            const fallbackMaps: Record<string, Record<string, string>> = {
+              structured_extraction: {
+                '0': 'data',
+                'data': 'data',
+                '1': 'prompt',
+                'prompt': 'prompt',
+                '2': 'originalText',
+                'originaltext': 'originalText',
+                '3': 'schema',
+                'schema': 'schema',
+                'needsLLM': 'needsLLM',
+                'needsllm': 'needsLLM',
+              },
+              schema_validator: {
+                '0': 'data',
+                'data': 'data',
+                '1': 'isValid',
+                'isvalid': 'isValid',
+                '2': 'error',
+                'error': 'error',
+                '3': 'validationErrors',
+                'validationerrors': 'validationErrors',
+                '4': 'repairedData',
+                'repaireddata': 'repairedData',
+              },
+              http_request: {
+                '0': 'response',
+                'response': 'response',
+                '1': 'error',
+                'error': 'error',
+                '2': 'metadata',
+                'metadata': 'metadata',
+              },
+              web_api: {
+                '0': 'output',
+                'output': 'output',
+                '1': 'error',
+                'error': 'error',
+                '2': 'response',
+                'response': 'response',
+              },
+              web_search: {
+                '0': 'results',
+                'results': 'results',
+                '1': 'metadata',
+                'metadata': 'metadata',
+                '2': 'error',
+                'error': 'error',
+              },
+              code_execution: {
+                '0': 'output',
+                'output': 'output',
+                '1': 'error',
+                'error': 'error',
+              },
+              upper_case: {
+                '0': 'output',
+                'output': 'output',
+                '1': 'metadata',
+                'metadata': 'metadata',
+                '2': 'error',
+                'error': 'error',
+              },
+            };
+
+            const fallback = fallbackMaps[sourceNode.type] || fallbackMaps[sourceNode.type as keyof typeof fallbackMaps];
+            if (fallback) {
+              outputFieldMap = { ...fallback };
+            }
+          }
+
+          const normalizedSourceHandle = sourceHandle?.toLowerCase?.();
+          let outputField = outputFieldMap[sourceHandle] ?? (normalizedSourceHandle
+            ? outputFieldMap[normalizedSourceHandle]
+            : undefined);
+
+          // Additional fallbacks: try numeric index or direct handle name
+          if (!outputField) {
+            const numericIndex = Number(sourceHandle);
+            if (!Number.isNaN(numericIndex) && nodeDefinition?.outputs?.[numericIndex]) {
+              outputField = nodeDefinition.outputs[numericIndex];
+            }
+          }
+          if (!outputField && sourceHandle in sourceValue) {
+            outputField = sourceHandle;
+          }
+
+          if (outputField && outputField in sourceValue) {
+            const inputName = inputNames[parseInt(targetHandle)] || targetHandle;
+            inputs[inputName] = sourceValue[outputField];
+          } else {
+            // Fallback to entire object minus the __multiOutput flag
+            const inputName = inputNames[parseInt(targetHandle)] || targetHandle;
+            const { __multiOutput, ...rest } = sourceValue;
+            inputs[inputName] = rest;
+          }
+        }
+        // Legacy IF node handling for backward compatibility
+        else if (sourceNode?.type === 'if' && sourceValue) {
           const ifSourceHandle = conn.sourceHandle || String(conn.from?.portIndex || 0);
           if (ifSourceHandle === '0' || ifSourceHandle === 'true') {
             inputs[targetHandle] = sourceValue.trueOutput;
@@ -266,7 +432,7 @@ export class NodeExecutor {
             inputs[targetHandle] = sourceValue.falseOutput;
           }
         } else {
-          // Map to input name or use handle as key
+          // Simple value - map to input name or use handle as key
           const inputName = inputNames[parseInt(targetHandle)] || targetHandle;
           inputs[inputName] = sourceValue;
         }

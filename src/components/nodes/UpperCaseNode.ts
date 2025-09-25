@@ -84,7 +84,12 @@ export const UpperCaseNode = createNodeDefinition(
   executeUpperCaseNode,      // 実行関数
   {
     description: 'Convert text to uppercase with optional formatting',
-    category: 'text-processing'
+    category: 'text-processing',
+    outputMapping: {
+      output: 'output',
+      metadata: 'metadata',
+      error: 'error'
+    }
   }
 );
 
