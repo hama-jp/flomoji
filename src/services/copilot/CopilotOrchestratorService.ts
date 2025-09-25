@@ -67,7 +67,7 @@ export class CopilotOrchestratorService {
     // Get model from settings
     const settings = StorageService.getSettings();
     this.llmAdapter = new LLMAdapter({
-      model: settings.model || 'gpt-4o'
+      model: settings.model || 'gpt-5-mini'
     });
     this.toolInvoker = new ToolInvoker();
     this.memory = new CopilotMemory();
@@ -243,7 +243,7 @@ export class CopilotOrchestratorService {
           return {
             label: 'LLM Processing',
             provider: config.model?.startsWith('claude') ? 'anthropic' : 'openai',
-            model: config.model || 'gpt-4o',
+            model: config.model || 'gpt-5-mini',
             temperature: config.temperature ?? 1,
             systemPrompt: '',
             prompt: 'Process the provided input and generate a helpful response.'

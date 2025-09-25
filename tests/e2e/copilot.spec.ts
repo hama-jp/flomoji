@@ -22,7 +22,7 @@ test.describe('Workflow Copilot', () => {
           provider: 'openai',
           apiKey: key,
           baseUrl: '',
-          model: 'gpt-4o',
+          model: 'gpt-5-mini',
           temperature: 0.7,
           maxTokens: 1024,
         })
