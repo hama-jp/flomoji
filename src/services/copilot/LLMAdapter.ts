@@ -31,7 +31,7 @@ interface ToolCall {
 
 export class LLMAdapter {
   private config: LLMConfig;
-  private defaultModel = 'gpt-4o';
+  private defaultModel = 'gpt-5-mini';
   private defaultTemperature = 0.7; // Default temperature for models that allow customization
   private defaultMaxTokens = 2048;
 
