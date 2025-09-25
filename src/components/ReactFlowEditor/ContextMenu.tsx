@@ -4,7 +4,7 @@ import { ChevronRight, ChevronDown, Plus, Trash2 } from 'lucide-react';
 
 import { useStore as useUIStore } from '../../store';
 import useReactFlowStore from '../../store/reactFlowStore';
-import { nodesByCategory } from '../nodes/index.js';
+import { nodesByCategory } from '../nodes';
 
 const ContextMenu: React.FC = () => {
   const contextMenu = useUIStore((state: any) => state.contextMenu);

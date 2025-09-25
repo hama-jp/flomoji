@@ -325,7 +325,82 @@ export class NodeExecutor {
             };
           }
 
-          let outputField = outputFieldMap[sourceHandle];
+          if (Object.keys(outputFieldMap).length === 0 && sourceNode) {
+            const fallbackMaps: Record<string, Record<string, string>> = {
+              structured_extraction: {
+                '0': 'data',
+                'data': 'data',
+                '1': 'prompt',
+                'prompt': 'prompt',
+                '2': 'originalText',
+                'originaltext': 'originalText',
+                '3': 'schema',
+                'schema': 'schema',
+                'needsLLM': 'needsLLM',
+                'needsllm': 'needsLLM',
+              },
+              schema_validator: {
+                '0': 'data',
+                'data': 'data',
+                '1': 'isValid',
+                'isvalid': 'isValid',
+                '2': 'error',
+                'error': 'error',
+                '3': 'validationErrors',
+                'validationerrors': 'validationErrors',
+                '4': 'repairedData',
+                'repaireddata': 'repairedData',
+              },
+              http_request: {
+                '0': 'response',
+                'response': 'response',
+                '1': 'error',
+                'error': 'error',
+                '2': 'metadata',
+                'metadata': 'metadata',
+              },
+              web_api: {
+                '0': 'output',
+                'output': 'output',
+                '1': 'error',
+                'error': 'error',
+                '2': 'response',
+                'response': 'response',
+              },
+              web_search: {
+                '0': 'results',
+                'results': 'results',
+                '1': 'metadata',
+                'metadata': 'metadata',
+                '2': 'error',
+                'error': 'error',
+              },
+              code_execution: {
+                '0': 'output',
+                'output': 'output',
+                '1': 'error',
+                'error': 'error',
+              },
+              upper_case: {
+                '0': 'output',
+                'output': 'output',
+                '1': 'metadata',
+                'metadata': 'metadata',
+                '2': 'error',
+                'error': 'error',
+              },
+            };
+
+            const fallback = fallbackMaps[sourceNode.type] || fallbackMaps[sourceNode.type as keyof typeof fallbackMaps];
+            if (fallback) {
+              outputFieldMap = { ...fallback };
+            }
+          }
+
+          const normalizedSourceHandle = sourceHandle?.toLowerCase?.();
+          let outputField = outputFieldMap[sourceHandle] ?? (normalizedSourceHandle
+            ? outputFieldMap[normalizedSourceHandle]
+            : undefined);
 
           // Additional fallbacks: try numeric index or direct handle name
           if (!outputField) {

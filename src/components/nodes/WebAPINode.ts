@@ -266,7 +266,12 @@ export const WebAPINode = createNodeDefinition(
   executeWebAPINode,
   {
     description: 'Generic Web API connector with flexible configuration for any REST API',
-    category: 'web-integration'
+    category: 'web-integration',
+    outputMapping: {
+      output: 'output',
+      error: 'error',
+      response: 'response'
+    }
     /* configUI: {
       authentication: {
         type: 'select',

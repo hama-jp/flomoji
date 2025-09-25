@@ -49,6 +49,13 @@ export interface WorkflowPreview {
   };
 }
 
+interface ToolExecutionContext {
+  createdNodes: Map<number, string>;
+  nodesByType: Map<string, string[]>;
+  nodeCounter: number;
+  nodeIds: Set<string>;
+}
+
 export class CopilotOrchestratorService {
   private promptBuilder: PromptBuilder;
   private llmAdapter: LLMAdapter;
@@ -60,7 +67,7 @@ export class CopilotOrchestratorService {
     // Get model from settings
     const settings = StorageService.getSettings();
     this.llmAdapter = new LLMAdapter({
-      model: settings.model || 'gpt-5'
+      model: settings.model || 'gpt-4o'
     });
     this.toolInvoker = new ToolInvoker();
     this.memory = new CopilotMemory();
@@ -79,78 +86,611 @@ export class CopilotOrchestratorService {
       const intent = await this.detectIntent(request);
 
       // Build context-aware prompt
-      const prompt = this.promptBuilder.build({
-        intent,
-        request,
-        memory: this.memory.getContext(),
+    const prompt = this.promptBuilder.build({
+      intent,
+      request,
+      memory: this.memory.getContext(),
+    });
+
+    console.log('Sending request to LLM with prompt');
+
+    const conversation = this.llmAdapter.createConversation(prompt);
+    const executionContext = this.createToolExecutionContext();
+    const toolResults: any[] = [];
+
+    if (request.context?.nodes) {
+      request.context.nodes.forEach(node => {
+        if (!node?.id || !node?.type) {
+          return;
+        }
+        this.registerExistingNode(executionContext, node);
       });
-
-      // Get LLM response with tool calls
-      const llmResponse = await this.llmAdapter.generate(prompt);
-
-      // Execute tool calls
-      const toolResults = await this.executeTools(llmResponse.toolCalls);
-
-      // Generate suggestions based on results
-      const suggestions = this.generateSuggestions(toolResults);
-
-      // Create preview if needed
-      const preview = await this.createPreview(suggestions, request.context);
-
-      // Save response to memory
-      this.memory.addConversation({
-        type: 'assistant',
-        message: llmResponse.explanation || '',
-        suggestions,
-        timestamp: new Date(),
-      });
-
-      return {
-        intent,
-        suggestions,
-        explanation: llmResponse.explanation,
-        preview,
-      };
-    } catch (error) {
-      console.error('Copilot Orchestrator Error:', error);
-      throw new Error('Failed to process copilot request');
     }
+
+    const maxIterations = 8;
+    let llmResponse = null as Awaited<ReturnType<typeof this.llmAdapter.generateWithConversation>> | null;
+
+    for (let iteration = 0; iteration < maxIterations; iteration++) {
+      const response = await this.llmAdapter.generateWithConversation(conversation);
+      llmResponse = response;
+
+      console.log('LLM Response:', {
+        iteration,
+        hasToolCalls: !!response.toolCalls,
+        toolCallsCount: response.toolCalls?.length || 0
+      });
+
+      if (response.rawMessage) {
+        conversation.push(response.rawMessage);
+      } else if (response.text) {
+        conversation.push({ role: 'assistant', content: response.text });
+      }
+
+      const toolCalls = response.toolCalls || [];
+      if (toolCalls.length === 0) {
+        break;
+      }
+
+      const executionResults = await this.executeTools(toolCalls, executionContext);
+      toolResults.push(...executionResults);
+
+      toolCalls.forEach((call, index) => {
+        const execution = executionResults[index];
+        const toolSummary = {
+          success: execution?.success ?? false,
+          type: execution?.type,
+          description: execution?.description,
+          nodeId: execution?.data?.node?.id,
+          nodeType: execution?.data?.node?.type,
+          edgeId: execution?.data?.edgeId,
+          edge: execution?.data?.edge
+            ? {
+                id: execution.data.edge.id,
+                source: execution.data.edge.source,
+                target: execution.data.edge.target,
+                sourceHandle: execution.data.edge.sourceHandle,
+                targetHandle: execution.data.edge.targetHandle,
+              }
+            : undefined,
+          error: execution?.error,
+        };
+
+        conversation.push({
+          role: 'tool',
+          tool_call_id: call.id,
+          content: JSON.stringify(toolSummary),
+        });
+      });
+    }
+
+    if (!llmResponse) {
+      throw new Error('No response received from LLM');
+    }
+
+    if ((llmResponse.toolCalls?.length || 0) > 0) {
+      console.warn('LLM returned tool calls after max iterations; stopping to avoid infinite loop.');
+    }
+
+    // Apply fallback if still incomplete
+    const fallbackResults = await this.ensureBasicFlow(request, toolResults, executionContext);
+    if (fallbackResults.length > 0) {
+      console.log('Applied fallback tool results to complete basic flow:', fallbackResults.length);
+      toolResults.push(...fallbackResults);
+    }
+
+    // Generate suggestions based on results
+    const suggestions = this.generateSuggestions(toolResults);
+
+    // Create preview if needed
+    const preview = await this.createPreview(suggestions, request.context);
+
+    // Save response to memory
+    this.memory.addConversation({
+      type: 'assistant',
+      message: llmResponse.explanation || llmResponse.text || '',
+      suggestions,
+      timestamp: new Date(),
+    });
+
+    return {
+      intent,
+      suggestions,
+      explanation: llmResponse.explanation || llmResponse.text || 'I\'ve analyzed your request and prepared some suggestions.',
+      preview,
+    };
+  } catch (error) {
+    console.error('Copilot Orchestrator Error:', error);
+    throw new Error('Failed to process copilot request');
+  }
+  }
+
+  private async ensureBasicFlow(
+    request: CopilotRequest,
+    toolResults: any[],
+    context: ToolExecutionContext
+  ): Promise<any[]> {
+    const message = request.message || '';
+    const lowerMessage = message.toLowerCase();
+    const additionalResults: any[] = [];
+    const nodesByType = context.nodesByType;
+    const config = this.llmAdapter.getConfig();
+
+    const wantsSearch = /(search|検索|ニュース|調べ|調査)/i.test(message);
+    const wantsHttp = /(http|https|api|webhook|リクエスト|fetch|curl)/i.test(message);
+    const wantsCombiner = /(combine|merge|結合|まとめて|連結|集約)/i.test(message);
+    const wantsLLM = /(llm|chatgpt|要約|生成|まとめ|回答|文章|chat|reply|応答|分析)/i.test(message) || (!wantsHttp && !wantsSearch);
+
+    const pipeline: string[] = ['input'];
+    if (wantsSearch) pipeline.push('web_search');
+    if (wantsHttp) pipeline.push('http_request');
+    if (wantsLLM) pipeline.push('llm');
+    if (wantsCombiner) pipeline.push('text_combiner');
+    pipeline.push('output');
+
+    const orderedTypes = pipeline.filter((type, index) => pipeline.indexOf(type) === index);
+
+    if (orderedTypes.length < 2) {
+      return [];
+    }
+
+    const getDefaultNodeData = (type: string) => {
+      switch (type) {
+        case 'input':
+          return { label: 'Input', inputType: 'text' };
+        case 'output':
+          return { label: 'Output' };
+        case 'llm':
+          return {
+            label: 'LLM Processing',
+            provider: config.model?.startsWith('claude') ? 'anthropic' : 'openai',
+            model: config.model || 'gpt-4o',
+            temperature: config.temperature ?? 1,
+            systemPrompt: '',
+            prompt: 'Process the provided input and generate a helpful response.'
+          };
+        case 'http_request':
+          return {
+            label: 'HTTP Request',
+            method: 'GET',
+            url: '',
+            headers: '{}',
+            timeout: 30000
+          };
+        case 'web_search':
+          return {
+            label: 'Web Search',
+            provider: 'google',
+            query: '',
+            maxResults: 10
+          };
+        case 'text_combiner':
+          return {
+            label: 'Combine Text',
+            mode: 'join',
+            separator: '\n'
+          };
+        default:
+          return { label: type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) };
+      }
+    };
+
+    const ensureNode = async (type: string, index: number) => {
+      if (nodesByType.has(type) && nodesByType.get(type)?.length) {
+        return;
+      }
+
+      const result = await this.toolInvoker.execute({
+        name: 'add_node',
+        parameters: {
+          type,
+          position: {
+            x: 160 + index * 260,
+            y: 140
+          },
+          data: getDefaultNodeData(type)
+        }
+      });
+
+      if (result.success && result.data?.node) {
+        const nodeId = result.data.node.id;
+        this.registerNodeReferences(
+          context,
+          nodeId,
+          result.data.node.type,
+          type,
+          (result.data.node.data as any)?.label
+        );
+        const nodeIndex = context.nodeCounter++;
+        context.createdNodes.set(nodeIndex, nodeId);
+        additionalResults.push(result);
+      }
+    };
+
+    for (let i = 0; i < orderedTypes.length; i++) {
+      await ensureNode(orderedTypes[i], i);
+    }
+
+    const existingConnections = new Set<string>();
+    const recordConnection = (edge: any) => {
+      if (edge?.source && edge?.target) {
+        existingConnections.add(`${edge.source}->${edge.target}:${edge.sourceHandle || ''}:${edge.targetHandle || ''}`);
+      }
+    };
+
+    toolResults.forEach(result => {
+      if (!result?.error && result.type === 'connect_nodes' && result.data?.edge) {
+        recordConnection(result.data.edge);
+      }
+    });
+    additionalResults.forEach(result => {
+      if (!result?.error && result.type === 'connect_nodes' && result.data?.edge) {
+        recordConnection(result.data.edge);
+      }
+    });
+
+    const connectionMatrix: Record<string, Record<string, { sourceHandle: string; targetHandle: string }>> = {
+      input: {
+        web_search: { sourceHandle: 'output', targetHandle: 'query' },
+        http_request: { sourceHandle: 'output', targetHandle: 'body' },
+        llm: { sourceHandle: 'output', targetHandle: 'input' },
+        text_combiner: { sourceHandle: 'output', targetHandle: 'input1' },
+        output: { sourceHandle: 'output', targetHandle: 'input' }
+      },
+      web_search: {
+        llm: { sourceHandle: 'results', targetHandle: 'input' },
+        text_combiner: { sourceHandle: 'results', targetHandle: 'input2' },
+        output: { sourceHandle: 'results', targetHandle: 'input' }
+      },
+      http_request: {
+        llm: { sourceHandle: 'response', targetHandle: 'input' },
+        text_combiner: { sourceHandle: 'response', targetHandle: 'input2' },
+        output: { sourceHandle: 'response', targetHandle: 'input' }
+      },
+      llm: {
+        text_combiner: { sourceHandle: 'output', targetHandle: 'input2' },
+        output: { sourceHandle: 'output', targetHandle: 'input' }
+      },
+      text_combiner: {
+        output: { sourceHandle: 'output', targetHandle: 'input' }
+      }
+    };
+
+    const ensureConnection = async (sourceType: string, targetType: string) => {
+      const sourceNodeId = nodesByType.get(sourceType)?.[0];
+      const targetNodeId = nodesByType.get(targetType)?.[0];
+
+      if (!sourceNodeId || !targetNodeId) {
+        return;
+      }
+
+      const handles = connectionMatrix[sourceType]?.[targetType] || { sourceHandle: 'output', targetHandle: 'input' };
+      const connectionKey = `${sourceNodeId}->${targetNodeId}:${handles.sourceHandle}:${handles.targetHandle}`;
+      if (existingConnections.has(connectionKey)) {
+        return;
+      }
+
+      const result = await this.toolInvoker.execute({
+        name: 'connect_nodes',
+        parameters: {
+          sourceId: sourceNodeId,
+          sourceHandle: handles.sourceHandle,
+          targetId: targetNodeId,
+          targetHandle: handles.targetHandle
+        }
+      });
+
+      if (result.success && result.data?.edge) {
+        additionalResults.push(result);
+        recordConnection(result.data.edge);
+      }
+    };
+
+    for (let i = 0; i < orderedTypes.length - 1; i++) {
+      await ensureConnection(orderedTypes[i], orderedTypes[i + 1]);
+    }
+
+    return additionalResults;
   }
 
   private async detectIntent(request: CopilotRequest): Promise<CopilotIntent> {
-    const intentPrompt = this.promptBuilder.buildIntentDetection(request);
-    const response = await this.llmAdapter.generate(intentPrompt);
+    try {
+      const intentPrompt = this.promptBuilder.buildIntentDetection(request);
+      const response = await this.llmAdapter.generate(intentPrompt, { toolChoice: 'none' });
+      const detected = this.extractIntentFromResponse(response, request);
+      if (detected) {
+        return detected;
+      }
+    } catch (error) {
+      console.warn('Copilot intent detection failed, using heuristic fallback:', error);
+    }
 
-    const intents: CopilotIntent[] = ['CREATE_FLOW', 'IMPROVE_FLOW', 'EXPLAIN', 'DEBUG', 'OPTIMIZE'];
-    
-    // Try to get intent from the response
-    let detectedIntent = response.intent as CopilotIntent;
-    
-    // If not found in intent field, try to extract from text
-    if (!detectedIntent && response.text) {
+    return this.heuristicIntentFallback(request);
+  }
+
+  private extractIntentFromResponse(response: any, request: CopilotRequest): CopilotIntent | null {
+    const intents: CopilotIntent[] = ['CREATE_FLOW', 'IMPROVE_FLOW', 'EXPLAIN', 'DEBUG', 'OPTIMIZE', 'UNKNOWN'];
+
+    if (response?.intent && intents.includes(response.intent)) {
+      return response.intent as CopilotIntent;
+    }
+
+    const textCandidates: string[] = [];
+
+    if (typeof response?.text === 'string') {
+      textCandidates.push(response.text);
+    }
+
+    if (response?.rawMessage?.content) {
+      if (typeof response.rawMessage.content === 'string') {
+        textCandidates.push(response.rawMessage.content);
+      } else if (Array.isArray(response.rawMessage.content)) {
+        response.rawMessage.content.forEach((segment: any) => {
+          if (typeof segment?.text === 'string') {
+            textCandidates.push(segment.text);
+          }
+        });
+      }
+    }
+
+    const parseJsonIntent = (payload: string): CopilotIntent | null => {
+      if (!payload) return null;
+      const jsonMatch = payload.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) return null;
+      try {
+        const parsed = JSON.parse(jsonMatch[0]);
+        const candidate = parsed?.intent as CopilotIntent | undefined;
+        if (candidate && intents.includes(candidate)) {
+          return candidate;
+        }
+      } catch (error) {
+        console.warn('Failed to parse intent JSON:', error);
+      }
+      return null;
+    };
+
+    for (const candidateText of textCandidates) {
+      const parsedIntent = parseJsonIntent(candidateText);
+      if (parsedIntent && parsedIntent !== 'UNKNOWN') {
+        return parsedIntent;
+      }
+    }
+
+    for (const candidateText of textCandidates) {
+      const upper = candidateText?.toUpperCase?.() ?? '';
       for (const intent of intents) {
-        if (response.text.includes(intent)) {
-          detectedIntent = intent;
-          break;
+        if (intent !== 'UNKNOWN' && upper.includes(intent)) {
+          return intent;
         }
       }
     }
 
-    // Default to CREATE_FLOW for workflow creation requests
-    if (!detectedIntent && request.message.toLowerCase().includes('create')) {
-      detectedIntent = 'CREATE_FLOW';
-    }
-
-    return intents.includes(detectedIntent) ? detectedIntent : 'CREATE_FLOW';
+    return null;
   }
 
-  private async executeTools(toolCalls: any[]): Promise<any[]> {
-    const results = [];
+  private heuristicIntentFallback(request: CopilotRequest): CopilotIntent {
+    const lowerMessage = (request.message || '').toLowerCase();
+    const nodeCount = request.context?.nodes?.length ?? 0;
 
-    for (const call of toolCalls) {
+    const keywordMap: Array<{ intent: CopilotIntent; keywords: string[] }> = [
+      { intent: 'DEBUG', keywords: ['bug', 'error', 'エラー', '失敗', 'デバッグ', 'debug'] },
+      { intent: 'OPTIMIZE', keywords: ['optimize', '高速', 'パフォーマンス', '効率', '最適化'] },
+      { intent: 'EXPLAIN', keywords: ['explain', '説明', '教えて', 'understand'] },
+      { intent: 'IMPROVE_FLOW', keywords: ['improve', '改善', 'refine', 'update', '調整'] },
+      { intent: 'CREATE_FLOW', keywords: ['create', 'build', '作成', '追加', 'new', '構築'] },
+    ];
+
+    for (const { intent, keywords } of keywordMap) {
+      if (keywords.some(keyword => lowerMessage.includes(keyword.toLowerCase()))) {
+        if (intent === 'CREATE_FLOW' && nodeCount > 0) {
+          return 'IMPROVE_FLOW';
+        }
+        return intent;
+      }
+    }
+
+    if (nodeCount === 0) {
+      return 'CREATE_FLOW';
+    }
+
+    return 'IMPROVE_FLOW';
+  }
+
+  private createToolExecutionContext(): ToolExecutionContext {
+    return {
+      createdNodes: new Map<number, string>(),
+      nodesByType: new Map<string, string[]>(),
+      nodeCounter: 1,
+      nodeIds: new Set<string>(),
+    };
+  }
+
+  private registerExistingNode(context: ToolExecutionContext, node: Node): void {
+    const label = (node.data as any)?.label;
+    const nodeType = node.type ?? 'unknown';
+    this.registerNodeReferences(context, node.id, nodeType, nodeType, label);
+
+    const index = context.nodeCounter++;
+    context.createdNodes.set(index, node.id);
+
+    const aliases = [
+      `node-${index}`,
+      `node_${index}`,
+      `[node-${index}]`,
+      `[node_${index}]`,
+    ];
+
+    aliases.forEach(alias => {
+      if (!context.nodesByType.has(alias)) {
+        context.nodesByType.set(alias, []);
+      }
+      const list = context.nodesByType.get(alias)!;
+      if (!list.includes(node.id)) {
+        list.push(node.id);
+      }
+    });
+  }
+
+  private registerNodeReferences(
+    context: ToolExecutionContext,
+    nodeId: string,
+    actualType: string | undefined,
+    requestedType?: string,
+    label?: string
+  ): void {
+    const aliases = new Set<string>();
+
+    const addAlias = (value?: string) => {
+      if (!value) return;
+      const normalized = String(value).trim();
+      if (!normalized) return;
+      aliases.add(normalized);
+      aliases.add(normalized.toLowerCase());
+      aliases.add(normalized.replace(/Node$/i, ''));
+      aliases.add(normalized.replace(/Node$/i, '').toLowerCase());
+      aliases.add(normalized.replace(/[_\s]+/g, '-'));
+      aliases.add(normalized.replace(/[_\s]+/g, '-').toLowerCase());
+    };
+
+    addAlias(actualType);
+    addAlias(requestedType);
+    addAlias(label);
+
+    aliases.forEach(alias => {
+      if (!alias) return;
+      if (!context.nodesByType.has(alias)) {
+        context.nodesByType.set(alias, []);
+      }
+      const list = context.nodesByType.get(alias)!;
+      if (!list.includes(nodeId)) {
+        list.push(nodeId);
+      }
+    });
+
+    context.nodeIds.add(nodeId);
+  }
+
+  private resolveNodeReference(reference: string, context: ToolExecutionContext): string | undefined {
+    if (!reference) {
+      return undefined;
+    }
+
+    const cleaned = reference.replace(/^\[|\]$/g, '');
+
+    const indexMatch = cleaned.match(/^(?:node[-_]?)(\d+)$/i);
+    if (indexMatch) {
+      const index = parseInt(indexMatch[1], 10);
+      return context.createdNodes.get(index);
+    }
+
+    if (context.nodeIds.has(cleaned)) {
+      return cleaned;
+    }
+
+    const lower = cleaned.toLowerCase();
+    if (context.nodeIds.has(lower)) {
+      return lower;
+    }
+
+    if (context.nodesByType.has(cleaned)) {
+      return context.nodesByType.get(cleaned)![0];
+    }
+
+    if (context.nodesByType.has(lower)) {
+      return context.nodesByType.get(lower)![0];
+    }
+
+    return undefined;
+  }
+
+  private async executeTools(toolCalls: any[], context: ToolExecutionContext): Promise<any[]> {
+    const results: any[] = [];
+
+    if (!toolCalls || toolCalls.length === 0) {
+      console.log('No tool calls received from LLM');
+      return results;
+    }
+
+    console.log(`Executing ${toolCalls.length} tool calls from LLM`);
+    
+    for (let i = 0; i < toolCalls.length; i++) {
+      const call = toolCalls[i];
+      
       try {
-        const result = await this.toolInvoker.execute(call);
-        results.push(result);
+        console.log(`Executing tool: ${call.name}`, call.parameters);
+        
+        // Handle node creation and track IDs
+        if (call.name === 'add_node') {
+          const result = await this.toolInvoker.execute(call);
+          if (result.success && result.data?.node) {
+            const nodeId = result.data.node.id;
+            const nodeType = result.data.node.type;
+            const requestedType = call.parameters.type;
+            const label = (result.data.node.data as any)?.label;
+
+            const nodeIndex = context.nodeCounter++;
+            context.createdNodes.set(nodeIndex, nodeId);
+            this.registerNodeReferences(context, nodeId, nodeType, requestedType, label);
+
+            console.log(`Created node ${nodeId} (global index: ${nodeIndex}, type: ${nodeType})`);
+          }
+          results.push(result);
+        }
+        // Handle connections with reference resolution
+        else if (call.name === 'connect_nodes') {
+          const params = { ...call.parameters };
+
+          if (params.sourceId) {
+            const resolved = this.resolveNodeReference(params.sourceId, context);
+            if (resolved) {
+              console.log(`Resolved source reference ${call.parameters.sourceId} to ${resolved}`);
+              params.sourceId = resolved;
+            }
+          }
+
+          if (params.targetId) {
+            const resolved = this.resolveNodeReference(params.targetId, context);
+            if (resolved) {
+              console.log(`Resolved target reference ${call.parameters.targetId} to ${resolved}`);
+              params.targetId = resolved;
+            }
+          }
+
+          const result = await this.toolInvoker.execute({
+            name: call.name,
+            parameters: params,
+          });
+          results.push(result);
+        }
+        else if (call.name === 'disconnect_nodes') {
+          const params = { ...call.parameters };
+
+          if (params.sourceId) {
+            const resolved = this.resolveNodeReference(params.sourceId, context);
+            if (resolved) {
+              console.log(`Resolved source reference ${call.parameters.sourceId} to ${resolved}`);
+              params.sourceId = resolved;
+            }
+          }
+
+          if (params.targetId) {
+            const resolved = this.resolveNodeReference(params.targetId, context);
+            if (resolved) {
+              console.log(`Resolved target reference ${call.parameters.targetId} to ${resolved}`);
+              params.targetId = resolved;
+            }
+          }
+
+          const result = await this.toolInvoker.execute({
+            name: call.name,
+            parameters: params,
+          });
+          results.push(result);
+        }
+        // Handle other tools normally
+        else {
+          const result = await this.toolInvoker.execute(call);
+          results.push(result);
+        }
       } catch (error) {
         console.error(`Tool execution failed for ${call.name}:`, error);
         results.push({ error: (error as Error).message });
@@ -185,6 +725,12 @@ export class CopilotOrchestratorService {
     const currentNodes = context?.nodes || [];
     const currentEdges = context?.edges || [];
 
+    console.log('Creating preview with:', {
+      currentNodesCount: currentNodes.length,
+      currentEdgesCount: currentEdges.length,
+      suggestionsCount: suggestions.length
+    });
+
     // Clone current state
     let previewNodes = [...currentNodes];
     let previewEdges = [...currentEdges];
@@ -197,10 +743,13 @@ export class CopilotOrchestratorService {
 
     // Apply suggestions to create preview
     for (const suggestion of suggestions) {
+      console.log('Applying suggestion:', suggestion.type, suggestion.data);
+
       switch (suggestion.type) {
         case 'add_node':
           previewNodes.push(suggestion.data.node);
           diff.added.push(suggestion.data.node.id);
+          console.log('Added node:', suggestion.data.node.id, 'Total nodes:', previewNodes.length);
           break;
 
         case 'remove_node':
@@ -219,6 +768,7 @@ export class CopilotOrchestratorService {
         case 'connect_nodes':
           previewEdges.push(suggestion.data.edge);
           diff.added.push(suggestion.data.edge.id);
+          console.log('Added edge:', suggestion.data.edge.id, 'Total edges:', previewEdges.length);
           break;
 
         case 'disconnect_nodes':
@@ -227,6 +777,12 @@ export class CopilotOrchestratorService {
           break;
       }
     }
+
+    console.log('Preview created:', {
+      nodes: previewNodes.map(n => ({ id: n.id, type: n.type })),
+      edges: previewEdges.map(e => ({ id: e.id, source: e.source, target: e.target })),
+      diff
+    });
 
     return {
       nodes: previewNodes,

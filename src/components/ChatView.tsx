@@ -3,10 +3,10 @@ import { useState, useRef, useEffect } from 'react'
 
 import { Send, Bot, User, AlertCircle } from 'lucide-react'
 
-import { Alert, AlertDescription } from '@/components/ui/alert.jsx'
-import { Button } from '@/components/ui/button.jsx'
-import { Card, CardContent } from '@/components/ui/card.jsx'
-import { Input } from '@/components/ui/input.jsx'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
 
 import llmService from '../services/llmService'
 import StorageService from '../services/storageService'

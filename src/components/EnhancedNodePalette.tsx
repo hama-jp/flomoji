@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import useReactFlowStore from '../store/reactFlowStore';
-import { nodesByCategory } from './nodes/index.js';
+import { nodesByCategory } from './nodes';
 import { ChevronDown, ChevronRight, Search, Star, Clock, X, Info, Plus } from 'lucide-react';
 
 interface NodeUsage {

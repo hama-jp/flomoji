@@ -31,6 +31,7 @@
     "test": "vitest --run",
     "test:coverage": "vitest --coverage",
     "test:ui": "vitest --ui",
+    "test:e2e": "playwright test",
     "security:audit": "pnpm audit",
     "preview": "vite preview",
     "deploy": "pnpm run build && gh-pages -d dist"
@@ -99,6 +100,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.34.0",
+    "@playwright/test": "^1.55.0",
     "@types/jexl": "^2.3.4",
     "@types/node": "^24.3.1",
     "@types/react": "^19.1.11",

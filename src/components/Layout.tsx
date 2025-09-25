@@ -3,9 +3,9 @@ import React, { useState, useEffect, useCallback } from 'react'
 
 import { Menu, Settings, MessageSquare, Workflow, Database, X, Sparkles } from 'lucide-react'
 
-import { Button } from '@/components/ui/button.jsx'
+import { Button } from '@/components/ui/button'
 
-import { useStore, selectSidebarOpen, useUIActions } from '../store/index.js'
+import { useStore, selectSidebarOpen, useUIActions } from '../store'
 
 import EnhancedNodePalette from './EnhancedNodePalette'
 

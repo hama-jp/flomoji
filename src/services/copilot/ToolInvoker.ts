@@ -3,6 +3,8 @@ import useReactFlowStore from '../../store/reactFlowStore';
 import { v4 as uuidv4 } from 'uuid';
 import { WorkflowTemplate } from '../../types/workflow';
 import nodeExecutorService from '../nodeExecutionService';
+import { nodeTypes as copilotNodeCatalog } from '../../constants/nodeTypes';
+import componentNodeDefinitions from '../../components/nodes';
 
 interface ToolResult {
   success: boolean;
@@ -13,7 +15,109 @@ interface ToolResult {
   confidence?: number;
 }
 
+type NodeHandleInfo = {
+  inputs: string[];
+  outputs: string[];
+};
+
+const HANDLE_CATALOG: Map<string, NodeHandleInfo> = new Map();
+
+copilotNodeCatalog.forEach(entry => {
+  HANDLE_CATALOG.set(entry.type, {
+    inputs: Array.isArray(entry.inputs) ? [...entry.inputs] : [],
+    outputs: Array.isArray(entry.outputs) ? [...entry.outputs] : [],
+  });
+});
+
+Object.entries(componentNodeDefinitions).forEach(([type, definition]) => {
+  if (!HANDLE_CATALOG.has(type)) {
+    HANDLE_CATALOG.set(type, {
+      inputs: Array.isArray(definition.inputs) ? [...definition.inputs] : [],
+      outputs: Array.isArray(definition.outputs) ? [...definition.outputs] : [],
+    });
+  }
+});
+
+const ADDITIONAL_HANDLE_DEFINITIONS: Record<string, NodeHandleInfo> = {
+  input: {
+    inputs: [],
+    outputs: ['0'],
+  },
+  output: {
+    inputs: ['0'],
+    outputs: [],
+  },
+  llm: {
+    inputs: ['0'],
+    outputs: ['0'],
+  },
+  timestamp: {
+    inputs: [],
+    outputs: ['0'],
+  },
+  structured_extraction: {
+    inputs: ['0', '1'],
+    outputs: ['0', '1', '2', '3', '4'],
+  },
+  schema_validator: {
+    inputs: ['0', '1', '2'],
+    outputs: ['0', '1', '2', '3', '4'],
+  },
+  http_request: {
+    inputs: ['body', 'query'],
+    outputs: ['response', 'error', 'metadata'],
+  },
+  web_search: {
+    inputs: ['query'],
+    outputs: ['results', 'metadata', 'error'],
+  },
+  code_execution: {
+    inputs: ['input'],
+    outputs: ['output', 'error'],
+  },
+  web_api: {
+    inputs: ['url', 'headers', 'body', 'query', 'path'],
+    outputs: ['output', 'error', 'response'],
+  },
+  variable_set: {
+    inputs: ['input'],
+    outputs: ['output'],
+  },
+  while: {
+    inputs: ['input', 'loop'],
+    outputs: ['output', 'loop'],
+  },
+  if: {
+    inputs: ['input'],
+    outputs: ['true', 'false'],
+  },
+  text_combiner: {
+    inputs: ['input1', 'input2', 'input3', 'input4'],
+    outputs: ['output'],
+  },
+  upper_case: {
+    inputs: ['input'],
+    outputs: ['output', 'metadata', 'error'],
+  },
+};
+
+Object.entries(ADDITIONAL_HANDLE_DEFINITIONS).forEach(([type, handles]) => {
+  HANDLE_CATALOG.set(type, {
+    inputs: [...handles.inputs],
+    outputs: [...handles.outputs],
+  });
+});
+
+// Provide aliases for node types that use different identifiers internally
+if (HANDLE_CATALOG.has('code_execution')) {
+  HANDLE_CATALOG.set('js_code', HANDLE_CATALOG.get('code_execution')!);
+}
+
 export class ToolInvoker {
+  private nodeHandles = new Map<string, NodeHandleInfo>();
+  constructor() {
+    this.syncExistingNodes();
+  }
   private templates: WorkflowTemplate[] = [
     {
       id: 'csv-to-slack',
@@ -89,6 +193,8 @@ export class ToolInvoker {
         return this.addNode(parameters);
       case 'connect_nodes':
         return this.connectNodes(parameters);
+      case 'disconnect_nodes':
+        return this.disconnectNodes(parameters);
       case 'update_node':
         return this.updateNode(parameters);
       case 'delete_node':
@@ -107,26 +213,78 @@ export class ToolInvoker {
 
   private addNode(params: { type: string; data: any; position: { x: number; y: number } }): ToolResult {
     try {
-      const nodeId = `${params.type}-${uuidv4().slice(0, 8)}`;
+      // Map generic types to actual node component types
+      const nodeTypeMap: Record<string, string> = {
+        'input': 'input',
+        'inputNode': 'input',
+        'output': 'output',
+        'outputNode': 'output',
+        'llm': 'llm',
+        'llmNode': 'llm',
+        'text': 'text',
+        'textNode': 'text',
+        'http': 'http_request',
+        'httpRequest': 'http_request',
+        'httpRequestNode': 'http_request',
+        'if': 'if',
+        'ifNode': 'if',
+        'while': 'while',
+        'whileNode': 'while',
+        'timestamp': 'timestamp',
+        'timestampNode': 'timestamp',
+        'variable': 'variable_set',
+        'variableSet': 'variable_set',
+        'variableSetNode': 'variable_set',
+        'textCombiner': 'text_combiner',
+        'textCombinerNode': 'text_combiner',
+        'schedule': 'schedule',
+        'scheduleNode': 'schedule',
+        'webSearch': 'web_search',
+        'webSearchNode': 'web_search',
+        'codeExecution': 'code_execution',
+        'codeExecutionNode': 'code_execution',
+        'webApi': 'web_api',
+        'webApiNode': 'web_api',
+        'structuredExtraction': 'structured_extraction',
+        'structuredExtractionNode': 'structured_extraction',
+        'schemaValidator': 'schema_validator',
+        'schemaValidatorNode': 'schema_validator',
+      };
+
+      // Get the correct node type or default to the provided type
+      const actualType = nodeTypeMap[params.type] || params.type;
+
+      const nodeId = `${actualType}-${uuidv4().slice(0, 8)}`;
       const newNode: Node = {
         id: nodeId,
-        type: params.type,
-        position: params.position,
+        type: actualType,
+        position: params.position || { x: 250, y: 250 },
         data: {
           ...params.data,
-          label: params.data.label || `${params.type} Node`,
+          label: params.data?.label || `${params.type} Node`,
         },
       };
 
-      // We'll need to call the store method from the component
-      // For now, return the data that should be applied
-      return {
+      const handles = this.lookupHandlesByType(actualType);
+      if (handles) {
+        newNode.data = {
+          ...newNode.data,
+          inputs: handles.inputs.map(handle => ({ id: handle, name: handle })),
+          outputs: handles.outputs.map(handle => ({ id: handle, name: handle })),
+        };
+      }
+
+      const result: ToolResult = {
         success: true,
         type: 'add_node',
         description: `Add ${params.type} node`,
         data: { node: newNode },
         confidence: 0.9,
       };
+
+      this.registerNodeHandlesInternal(nodeId, actualType);
+
+      return result;
     } catch (error) {
       return {
         success: false,
@@ -142,13 +300,51 @@ export class ToolInvoker {
     targetHandle: string;
   }): ToolResult {
     try {
+      const normalizeHandle = (handle: string | undefined, role: 'source' | 'target') => {
+        const fallback = role === 'source' ? 'output' : 'input';
+
+        if (!handle) {
+          return fallback;
+        }
+
+        const lowered = handle.trim().toLowerCase();
+        const canonicalMatches = role === 'source'
+          ? ['output', 'out', 'default', 'result']
+          : ['input', 'in', 'default', 'target', 'result'];
+
+        if (canonicalMatches.includes(lowered)) {
+          return fallback;
+        }
+
+        return lowered;
+      };
+
+      const sourceHandle = normalizeHandle(params.sourceHandle, 'source');
+      const targetHandle = normalizeHandle(params.targetHandle, 'target');
+
+      const resolvedSource = this.resolveHandle(params.sourceId, sourceHandle, 'source');
+      if (resolvedSource.error) {
+        return {
+          success: false,
+          error: resolvedSource.error,
+        };
+      }
+
+      const resolvedTarget = this.resolveHandle(params.targetId, targetHandle, 'target');
+      if (resolvedTarget.error) {
+        return {
+          success: false,
+          error: resolvedTarget.error,
+        };
+      }
+
       const edgeId = `edge-${uuidv4().slice(0, 8)}`;
       const newEdge: Edge = {
         id: edgeId,
         source: params.sourceId,
-        sourceHandle: params.sourceHandle,
+        sourceHandle: resolvedSource.handle,
         target: params.targetId,
-        targetHandle: params.targetHandle,
+        targetHandle: resolvedTarget.handle,
         type: 'default',
       };
 
@@ -158,6 +354,190 @@ export class ToolInvoker {
         description: `Connect ${params.sourceId} to ${params.targetId}`,
         data: { edge: newEdge },
         confidence: 0.85,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: (error as Error).message,
+      };
+    }
+  }
+
+  private lookupHandlesByType(type: string): NodeHandleInfo | null {
+    const info = HANDLE_CATALOG.get(type);
+    if (info) {
+      return {
+        inputs: [...info.inputs],
+        outputs: [...info.outputs],
+      };
+    }
+    return null;
+  }
+
+  public registerHandlesForNode(nodeId: string, nodeType?: string): void {
+    this.registerNodeHandlesInternal(nodeId, nodeType);
+  }
+
+  private registerNodeHandlesInternal(nodeId: string, nodeType: string | undefined): void {
+    if (!nodeType || this.nodeHandles.has(nodeId)) {
+      return;
+    }
+
+    const handles = this.lookupHandlesByType(nodeType);
+    if (handles) {
+      this.nodeHandles.set(nodeId, handles);
+    }
+  }
+
+  private ensureHandlesForNode(nodeId: string): NodeHandleInfo | null {
+    if (this.nodeHandles.has(nodeId)) {
+      return this.nodeHandles.get(nodeId)!;
+    }
+
+    const store = useReactFlowStore.getState();
+    const nodes = Array.isArray(store.nodes) ? store.nodes : [];
+    const existing = nodes.find(n => n.id === nodeId);
+    if (existing) {
+      this.registerNodeHandlesInternal(existing.id, existing.type);
+      return this.nodeHandles.get(nodeId) || null;
+    }
+
+    return null;
+  }
+
+  private syncExistingNodes(): void {
+    const store = useReactFlowStore.getState();
+    const nodes = Array.isArray(store.nodes) ? store.nodes : [];
+    nodes.forEach(node => {
+      this.registerNodeHandlesInternal(node.id, node.type);
+    });
+  }
+
+  private resolveHandle(
+    nodeId: string,
+    handle: string,
+    role: 'source' | 'target'
+  ): { handle: string; error?: string } {
+    const info = this.ensureHandlesForNode(nodeId);
+
+    if (!info) {
+      // If we can't resolve the handles (e.g., node not yet created), allow the connection
+      return { handle };
+    }
+
+    const candidates = role === 'source' ? info.outputs : info.inputs;
+
+    if (!candidates || candidates.length === 0) {
+      return { handle };
+    }
+
+    const canonicalMap = new Map<string, string>();
+    candidates.forEach(h => {
+      canonicalMap.set(h.toLowerCase(), h);
+    });
+
+    const normalized = handle.trim().toLowerCase();
+
+    if (canonicalMap.has(normalized)) {
+      return { handle: canonicalMap.get(normalized)! };
+    }
+
+    if (/^\d+$/.test(handle)) {
+      const numericIndex = Number(handle);
+      if (!Number.isNaN(numericIndex) && candidates[numericIndex]) {
+        return { handle: candidates[numericIndex] };
+      }
+    }
+
+    if (normalized === 'output') {
+      if (canonicalMap.has('output')) {
+        return { handle: canonicalMap.get('output')! };
+      }
+      if (candidates.length === 1) {
+        return { handle: candidates[0] };
+      }
+      const firstOutput = candidates.find(h => h.toLowerCase().startsWith('output'));
+      if (firstOutput) {
+        return { handle: firstOutput };
+      }
+    }
+
+    if (normalized === 'input') {
+      if (canonicalMap.has('input')) {
+        return { handle: canonicalMap.get('input')! };
+      }
+      if (candidates.length === 1) {
+        return { handle: candidates[0] };
+      }
+      const firstInput = candidates.find(h => h.toLowerCase().startsWith('input'));
+      if (firstInput) {
+        return { handle: firstInput };
+      }
+    }
+
+    return {
+      handle,
+      error: `Invalid ${role} handle "${handle}" for node ${nodeId}. Available handles: ${candidates.join(', ')}`,
+    };
+  }
+
+  private disconnectNodes(params: {
+    edgeId?: string;
+    sourceId?: string;
+    sourceHandle?: string;
+    targetId?: string;
+    targetHandle?: string;
+  }): ToolResult {
+    try {
+      const store = useReactFlowStore.getState();
+      const edges = Array.isArray(store.edges) ? store.edges : [];
+
+      const normalizeHandle = (handle?: string | null) => handle?.toLowerCase();
+
+      const matchHandle = (edgeHandle?: string | null, requested?: string) => {
+        if (!requested) {
+          return true;
+        }
+        if (!edgeHandle) {
+          return false;
+        }
+        return edgeHandle.toLowerCase() === requested.toLowerCase();
+      };
+
+      let edgeToRemove = params.edgeId
+        ? edges.find(edge => edge.id === params.edgeId)
+        : undefined;
+
+      const resolvedSourceHandle = normalizeHandle(params.sourceHandle);
+      const resolvedTargetHandle = normalizeHandle(params.targetHandle);
+
+      if (!edgeToRemove && params.sourceId && params.targetId) {
+        edgeToRemove = edges.find(edge => {
+          if (edge.source !== params.sourceId || edge.target !== params.targetId) {
+            return false;
+          }
+          return matchHandle(edge.sourceHandle, resolvedSourceHandle) &&
+            matchHandle(edge.targetHandle, resolvedTargetHandle);
+        });
+
+        if (!edgeToRemove) {
+          edgeToRemove = edges.find(edge => edge.source === params.sourceId && edge.target === params.targetId);
+        }
+      }
+
+      if (!edgeToRemove) {
+        return {
+          success: false,
+          error: 'No matching edge found to disconnect. Provide edgeId or valid source/target identifiers.',
+        };
+      }
+
+      return {
+        success: true,
+        type: 'disconnect_nodes',
+        description: `Disconnect ${edgeToRemove.source} from ${edgeToRemove.target}`,
+        data: { edgeId: edgeToRemove.id },
+        confidence: 0.8,
       };
     } catch (error) {
       return {
@@ -268,6 +648,7 @@ export class ToolInvoker {
     switch (suggestion.type) {
       case 'add_node':
         store.addNode(suggestion.data.node);
+        this.registerHandlesForNode(suggestion.data.node.id, suggestion.data.node.type);
         break;
 
       case 'connect_nodes':

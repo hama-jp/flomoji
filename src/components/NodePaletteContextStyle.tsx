@@ -2,7 +2,7 @@ import React from 'react';
 
 import useReactFlowStore from '../store/reactFlowStore';
 
-import { nodesByCategory } from './nodes/index.js';
+import { nodesByCategory } from './nodes';
 
 const NodePaletteContextStyle: React.FC = () => {
   const addNode = useReactFlowStore((state: any) => state.addNode);

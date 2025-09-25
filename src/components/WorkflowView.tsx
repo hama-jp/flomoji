@@ -2,8 +2,8 @@ import React from 'react';
 
 import { ReactFlowProvider } from '@xyflow/react';
 
-import ErrorBoundary from './ErrorBoundary.jsx';
-import ReactFlowEditor from './ReactFlowEditor/index.jsx';
+import ErrorBoundary from './ErrorBoundary';
+import ReactFlowEditor from './ReactFlowEditor';
 import { DebuggerPanel } from './DebuggerPanel';
 import { DataFlowVisualization } from './DataFlowVisualization';
 import { WorkflowCopilotPanel } from './WorkflowCopilotPanel';

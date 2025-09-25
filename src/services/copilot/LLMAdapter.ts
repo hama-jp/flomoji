@@ -6,6 +6,7 @@ interface LLMConfig {
   temperature?: number;
   maxTokens?: number;
   apiEndpoint?: string;
+  toolChoice?: 'auto' | 'required' | 'none';
 }
 
 interface LLMResponse {
@@ -18,6 +19,8 @@ interface LLMResponse {
     completionTokens: number;
     totalTokens: number;
   };
+  rawMessage?: any;
+  conversation?: any[];
 }
 
 interface ToolCall {
@@ -28,19 +31,69 @@ interface ToolCall {
 
 export class LLMAdapter {
   private config: LLMConfig;
-  private defaultModel = 'gpt-5';
-  private defaultTemperature = 1; // GPT-5 only supports temperature 1
-  private defaultMaxTokens = 2000;
+  private defaultModel = 'gpt-4o';
+  private defaultTemperature = 0.7; // Default temperature for models that allow customization
+  private defaultMaxTokens = 2048;
 
   constructor(config?: LLMConfig) {
     const settings = StorageService.getSettings();
+    const model = config?.model || settings.model || this.defaultModel;
+    
+    // For models that only support temperature=1, force it to 1
+    let temperature = config?.temperature || settings.temperature || this.defaultTemperature;
+    if (this.requiresDefaultTemperature(model)) {
+      temperature = 1;
+    }
+    
+    const maxTokensSetting = config?.maxTokens ?? settings.maxTokens ?? this.defaultMaxTokens;
+    const normalizedMaxTokens = this.clampMaxTokens(model, maxTokensSetting);
+
     this.config = {
-      model: config?.model || this.defaultModel,
-      temperature: config?.temperature || settings.temperature || this.defaultTemperature,
-      maxTokens: config?.maxTokens || settings.maxTokens || this.defaultMaxTokens,
+      model,
+      temperature,
+      maxTokens: normalizedMaxTokens,
       apiKey: config?.apiKey || settings.apiKey || '',
       apiEndpoint: config?.apiEndpoint || settings.baseUrl || 'https://api.openai.com/v1/chat/completions',
+      toolChoice: config?.toolChoice || 'auto',
     };
+  }
+
+  private requiresDefaultTemperature(model?: string): boolean {
+    if (!model) {
+      return false;
+    }
+
+    const fixedTemperatureModels = new Set([
+      'gpt-4-turbo-preview',
+      'gpt-4-1106-preview',
+    ]);
+
+    if (fixedTemperatureModels.has(model)) {
+      return true;
+    }
+
+    return /^(gpt-5|o4)/i.test(model);
+  }
+
+  private getMaxTokensField(model?: string): 'max_tokens' | 'max_completion_tokens' {
+    if (!model) {
+      return 'max_tokens';
+    }
+
+    if (/^(gpt-5|o4)/i.test(model)) {
+      return 'max_completion_tokens';
+    }
+
+    return 'max_tokens';
+  }
+
+  private clampMaxTokens(model: string | undefined, requested: number): number {
+    if (!requested || requested <= 0) {
+      return this.defaultMaxTokens;
+    }
+
+    const upperBound = /^(gpt-5|o4)/i.test(model || '') ? 8192 : 4096;
+    return Math.max(1, Math.min(requested, upperBound));
   }
 
   private getApiKeyFromEnv(): string {
@@ -50,56 +103,38 @@ export class LLMAdapter {
   }
 
   async generate(prompt: string, options?: Partial<LLMConfig>): Promise<LLMResponse> {
+    const conversation = this.createConversation(prompt);
+    const response = await this.generateWithConversation(conversation, options);
+    response.conversation = conversation;
+    return response;
+  }
+
+  async generateWithConversation(
+    conversation: any[],
+    options?: Partial<LLMConfig>
+  ): Promise<LLMResponse> {
     const config = { ...this.config, ...options };
+    config.maxTokens = this.clampMaxTokens(config.model, config.maxTokens ?? this.defaultMaxTokens);
+
+    // Force temperature to 1 for models that don't support other values
+    if (this.requiresDefaultTemperature(config.model)) {
+      console.log('⚠️ Forcing temperature to 1.0 for', config.model);
+      config.temperature = 1;
+    }
 
     if (!config.apiKey) {
       throw new Error('OpenAI API key is required. Please set it in settings.');
     }
 
     try {
-      const messages = this.buildMessages(prompt);
-      const tools = this.getAvailableTools();
-
-      // Build request body - only include temperature if it's not 1 (but GPT-5 only supports 1)
-      const requestBody: any = {
-        model: config.model,
-        messages,
-        tools,
-        tool_choice: 'auto',
-        max_completion_tokens: config.maxTokens,
-      };
-
-      // For GPT-5 models, only include temperature if it's exactly 1
-      // Otherwise omit it to use the default
-      if (config.model?.startsWith('gpt-5')) {
-        // Don't include temperature for GPT-5 models as they only support default (1)
-      } else {
-        requestBody.temperature = config.temperature;
-      }
-
-      const response = await fetch(config.apiEndpoint!, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${config.apiKey}`,
-        },
-        body: JSON.stringify(requestBody),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(`LLM API Error: ${error.error?.message || response.statusText}`);
-      }
-
-      const data = await response.json();
-      return this.parseResponse(data);
+      return await this.sendRequest(conversation, config);
     } catch (error) {
       console.error('LLM Adapter Error:', error);
       throw error;
     }
   }
 
-  private buildMessages(prompt: string): any[] {
+  createConversation(prompt: string): any[] {
     return [
       {
         role: 'system',
@@ -110,6 +145,78 @@ export class LLMAdapter {
         content: prompt,
       },
     ];
+  }
+
+  private async sendRequest(
+    conversation: any[],
+    config: LLMConfig
+  ): Promise<LLMResponse> {
+    const tools = this.getAvailableTools();
+
+    const lastMessage = conversation[conversation.length - 1];
+    const messagePreview = typeof lastMessage?.content === 'string'
+      ? lastMessage.content
+      : JSON.stringify(lastMessage?.content);
+
+    console.log('🚀 LLM Request:', {
+      model: config.model,
+      temperature: config.temperature,
+      messageLength: conversation.length,
+      promptPreview: `${messagePreview?.substring(0, 200) || ''}...`,
+      toolsCount: tools.length,
+      tool_choice: config.toolChoice ?? 'auto',
+      parallel_tool_calls: true
+    });
+
+    const toolChoice = config.toolChoice ?? 'auto';
+    const requestBody: any = {
+      model: config.model,
+      messages: conversation,
+    };
+
+    if (toolChoice !== 'none' && tools.length > 0) {
+      requestBody.tools = tools;
+      requestBody.tool_choice = toolChoice;
+      requestBody.parallel_tool_calls = true;
+    }
+
+    if (config.maxTokens !== undefined) {
+      const maxTokensField = this.getMaxTokensField(config.model);
+      const capped = this.clampMaxTokens(config.model, config.maxTokens);
+      requestBody[maxTokensField] = capped;
+      console.log('🧮 Using max tokens:', capped, 'via', maxTokensField);
+    }
+
+    if (this.requiresDefaultTemperature(config.model)) {
+      console.log('📝 Omitting temperature from request for', config.model);
+    } else {
+      requestBody.temperature = config.temperature;
+      console.log('📝 Using temperature:', config.temperature, 'for', config.model);
+    }
+
+    console.log('📤 Sending to OpenAI API:', config.apiEndpoint);
+
+    const response = await fetch(config.apiEndpoint!, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${config.apiKey}`,
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      console.error('❌ LLM API Error Response:', error);
+      throw new Error(`LLM API Error: ${error.error?.message || response.statusText}`);
+    }
+
+    const data = await response.json();
+    console.log('✅ LLM Raw Response received');
+    const parsed = this.parseResponse(data);
+    parsed.rawMessage = data.choices?.[0]?.message;
+    parsed.conversation = conversation;
+    return parsed;
   }
 
   private getAvailableTools(): any[] {
@@ -169,6 +276,39 @@ export class LLMAdapter {
               },
             },
             required: ['sourceId', 'sourceHandle', 'targetId', 'targetHandle'],
+          },
+        },
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'disconnect_nodes',
+          description: 'Disconnect two nodes by removing the edge between them',
+          parameters: {
+            type: 'object',
+            properties: {
+              edgeId: {
+                type: 'string',
+                description: 'ID of the edge to remove',
+              },
+              sourceId: {
+                type: 'string',
+                description: 'Source node ID or reference',
+              },
+              sourceHandle: {
+                type: 'string',
+                description: 'Source handle name (optional)',
+              },
+              targetId: {
+                type: 'string',
+                description: 'Target node ID or reference',
+              },
+              targetHandle: {
+                type: 'string',
+                description: 'Target handle name (optional)',
+              },
+            },
+            required: [],
           },
         },
       },
@@ -249,17 +389,32 @@ export class LLMAdapter {
   }
 
   private parseResponse(data: any): LLMResponse {
+    console.log('📊 Parsing LLM Response...');
+    
     const message = data.choices[0]?.message;
 
     const toolCalls: ToolCall[] = [];
     if (message?.tool_calls) {
-      message.tool_calls.forEach((call: any) => {
-        toolCalls.push({
-          id: call.id,
-          name: call.function.name,
-          parameters: JSON.parse(call.function.arguments),
-        });
+      console.log(`🔧 Found ${message.tool_calls.length} tool calls in response`);
+      
+      message.tool_calls.forEach((call: any, index: number) => {
+        try {
+          const toolCall = {
+            id: call.id,
+            name: call.function.name,
+            parameters: JSON.parse(call.function.arguments),
+          };
+          console.log(`  Tool ${index + 1}: ${toolCall.name}`, toolCall.parameters);
+          toolCalls.push(toolCall);
+        } catch (error) {
+          console.error(`  ❌ Failed to parse tool call ${index + 1}:`, error, call);
+        }
       });
+      
+      console.log('✅ Successfully parsed all tool calls');
+    } else {
+      console.log('⚠️ No tool calls found in LLM response');
+      console.log('Message content:', message?.content || 'No content');
     }
 
     // Try to extract intent from the message content
@@ -281,7 +436,7 @@ export class LLMAdapter {
       }
     }
 
-    return {
+    const response = {
       text: content,
       intent,
       explanation: content,
@@ -292,6 +447,15 @@ export class LLMAdapter {
         totalTokens: data.usage.total_tokens,
       } : undefined,
     };
+
+    console.log('📝 Final parsed response:', {
+      hasText: !!response.text,
+      intent: response.intent,
+      toolCallsCount: response.toolCalls.length,
+      usage: response.usage
+    });
+
+    return response;
   }
 
   async generateStream(
@@ -305,7 +469,7 @@ export class LLMAdapter {
       throw new Error('OpenAI API key is required');
     }
 
-    const messages = this.buildMessages(prompt);
+    const messages = this.createConversation(prompt);
 
     const requestBody: any = {
       model: config.model,
@@ -314,11 +478,17 @@ export class LLMAdapter {
     };
 
     // Handle parameters based on model
-    if (config.model?.startsWith('gpt-5')) {
-      requestBody.max_completion_tokens = config.maxTokens;
-      // Don't include temperature for GPT-5
+    if (config.maxTokens !== undefined) {
+      const maxTokensField = this.getMaxTokensField(config.model);
+      const capped = this.clampMaxTokens(config.model, config.maxTokens);
+      requestBody[maxTokensField] = capped;
+      console.log('🧮 (stream) Using max tokens:', capped, 'via', maxTokensField);
+    }
+    
+    // Only include temperature if the model supports it
+    if (this.requiresDefaultTemperature(config.model)) {
+      // These models only support temperature=1, so omit it to use default
     } else {
-      requestBody.max_tokens = config.maxTokens;
       requestBody.temperature = config.temperature;
     }
 
@@ -365,7 +535,16 @@ export class LLMAdapter {
   }
 
   updateConfig(config: Partial<LLMConfig>): void {
-    this.config = { ...this.config, ...config };
+    const newConfig = { ...this.config, ...config };
+    
+    // Force temperature to 1 for models that don't support other values
+    if (this.requiresDefaultTemperature(newConfig.model)) {
+      newConfig.temperature = 1;
+    }
+
+    newConfig.maxTokens = this.clampMaxTokens(newConfig.model, newConfig.maxTokens ?? this.defaultMaxTokens);
+    
+    this.config = newConfig;
   }
 
   getConfig(): LLMConfig {

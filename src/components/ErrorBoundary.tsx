@@ -50,6 +50,12 @@ class ErrorBoundary extends Component<Props, State> {
     const isRepeatedError = now - lastErrorTime < 5000; // Within 5 seconds
     const newErrorCount = isRepeatedError ? errorCount + 1 : 1;
 
+    // Debug logging for previewMode error
+    console.error('ErrorBoundary caught error:', error);
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
+    console.error('Component stack:', errorInfo.componentStack);
+
     this.setState({
       error,
       errorInfo,
@@ -228,7 +234,7 @@ ${errorInfo?.componentStack || 'No component stack available'}
                         <div className="p-2 bg-white rounded border border-gray-200">
                           <div className="font-semibold text-gray-600 mb-1">エラーメッセージ:</div>
                           <div className="font-mono text-red-600 break-all">
-                            {error.toString()}
+                            {error.message || error.toString()}
                           </div>
                         </div>
 

@@ -47,22 +47,50 @@ class LLMService {
     this.settings = this.loadSettings();
   }
 
+  private clampMaxTokens(model: string | undefined, requested: number | undefined): number {
+    const fallback = 2048;
+    if (!requested || requested <= 0) {
+      return fallback;
+    }
+
+    const upperBound = model && /^(gpt-5|o4)/i.test(model) ? 8192 : 4096;
+    return Math.max(1, Math.min(requested, upperBound));
+  }
+
   // 設定をローカルストレージから読み込み
   loadSettings(): ExtendedLLMSettings {
-    return StorageService.getSettings({
+    const loaded = StorageService.getSettings({
       provider: 'openai',
       apiKey: '',
       baseUrl: '',
       model: 'gpt-3.5-turbo',
       temperature: 0.7,
-      maxTokens: 50000
+      maxTokens: 2048
     }) as ExtendedLLMSettings;
+
+    if (!loaded) {
+      return {
+        provider: 'openai',
+        apiKey: '',
+        baseUrl: '',
+        model: 'gpt-3.5-turbo',
+        temperature: 0.7,
+        maxTokens: 2048
+      };
+    }
+
+    loaded.maxTokens = this.clampMaxTokens(loaded.model, loaded.maxTokens);
+    return loaded;
   }
 
   // 設定を保存
   saveSettings(settings: ExtendedLLMSettings): void {
-    this.settings = settings;
-    StorageService.setSettings(settings);
+    const normalized: ExtendedLLMSettings = {
+      ...settings,
+      maxTokens: this.clampMaxTokens(settings.model, settings.maxTokens),
+    };
+    this.settings = normalized;
+    StorageService.setSettings(normalized);
   }
 
   // API接続テスト
@@ -87,7 +115,8 @@ class LLMService {
     options: Partial<ExtendedLLMSettings> = {}
   ): Promise<string> {
     const currentSettings: ExtendedLLMSettings = { ...this.settings, ...options };
-    const { provider, apiKey, baseUrl, model, temperature, maxTokens }: any = currentSettings;
+    const { provider, apiKey, baseUrl, model, temperature }: any = currentSettings;
+    const maxTokens = this.clampMaxTokens(model, currentSettings.maxTokens);
 
     // メッセージの検証
     if (!message || typeof message !== 'string' || message.trim() === '') {

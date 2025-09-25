@@ -208,15 +208,32 @@ const useReactFlowStore = create<ReactFlowState>()(
       },
       beginPreview: ({ nodes, edges }) => {
         const state = get();
+        console.log('beginPreview called with:', {
+          nodesCount: nodes?.length || 0,
+          edgesCount: edges?.length || 0,
+          nodes: nodes?.map(n => ({ id: n.id, type: n.type }))
+        });
+
         const originalSnapshot: HistoryState = {
           nodes: state.nodes.map(node => ({ ...node, data: { ...node.data } })),
           edges: state.edges.map(edge => ({ ...edge })),
           viewport: state.viewport,
         };
 
+        const newNodes = nodes.map(node => ({ ...node, data: { ...node.data } }));
+        const newEdges = edges.map(edge => ({ ...edge }));
+
+        console.log('Setting preview state:', {
+          nodesBefore: state.nodes.length,
+          nodesAfter: newNodes.length,
+          edgesBefore: state.edges.length,
+          edgesAfter: newEdges.length,
+          newNodes: newNodes
+        });
+
         set({
-          nodes: nodes.map(node => ({ ...node, data: { ...node.data } })),
-          edges: edges.map(edge => ({ ...edge })),
+          nodes: newNodes,
+          edges: newEdges,
           previewActive: true,
           previewOriginal: state.previewOriginal ?? originalSnapshot,
         });

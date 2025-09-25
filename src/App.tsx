@@ -1,10 +1,10 @@
 import React, { useState } from "react";
 import { useEffect } from 'react'
 
-import ChatView from './components/ChatView.jsx'
-import DataView from './components/DataView.jsx'
+import ChatView from './components/ChatView'
+import DataView from './components/DataView'
 import Layout from './components/Layout'
-import SettingsView from './components/SettingsView.jsx'
+import SettingsView from './components/SettingsView'
 import WorkflowView from './components/WorkflowView'
 import ErrorNotification from './components/ErrorNotification'
 import workflowManagerService from './services/workflowManagerService'

@@ -143,6 +143,11 @@ export const WorkflowCopilotPanel: React.FC<WorkflowCopilotPanelProps> = ({
       setMessages(prev => [...prev, assistantMessage]);
 
       if (response.preview) {
+        console.log('Setting preview with:', {
+          nodes: response.preview.nodes,
+          edges: response.preview.edges
+        });
+
         beginPreview({
           nodes: response.preview.nodes,
           edges: response.preview.edges,
@@ -419,7 +424,7 @@ export const WorkflowCopilotPanel: React.FC<WorkflowCopilotPanelProps> = ({
 
                   {/* Suggestions */}
                   {message.suggestions && message.suggestions.length > 0 && (
-                    <div className="mt-3 space-y-2">
+                    <div className="mt-3 space-y-2" data-testid="copilot-suggestions">
                       {message.suggestions.map((suggestion) => (
                         <div
                           key={suggestion.id}
