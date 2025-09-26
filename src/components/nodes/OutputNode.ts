@@ -11,14 +11,16 @@ import type { WorkflowNode, NodeInputs, INodeExecutionContext, NodeOutput } from
 async function executeOutputNode(
   node: WorkflowNode,
   inputs: NodeInputs,
-  context: INodeExecutionContext
+  context?: INodeExecutionContext
 ): Promise<NodeOutput> {
   const format = node.data.format || 'text';
   const inputValue = Object.values(inputs)[0] || '';
   const outputName = node.data.name || 'output';
 
   // Set the output value as a variable in the execution context
-  context.setVariable(outputName, inputValue);
+  if (context) {
+    context.setVariable(outputName, inputValue);
+  }
   
   switch (format) {
     case 'json':

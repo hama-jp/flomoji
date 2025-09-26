@@ -31,7 +31,8 @@ export type NodeType =
   | 'schema_validator'
   | 'json_transform'
   | 'array_operations'
-  | 'data_transform';
+  | 'data_transform'
+  | 'workflow';
 
 /**
  * Execution context interface for node execution
@@ -84,11 +85,31 @@ export interface NodeDefinition {
 /**
  * Node instance in a workflow
  */
+/**
+ * Data structure for node-specific properties
+ */
+export interface NodeData extends Record<string, any> {
+  label?: string;
+  // For InputNode
+  value?: any;
+  inputType?: 'text' | 'file';
+  fileContent?: string;
+  name?: string;
+  // For OutputNode
+  format?: 'text' | 'json';
+  title?: string;
+  // For WorkflowNode
+  workflowId?: string;
+  workflowName?: string;
+  inputs?: { id: string; name: string }[];
+  outputs?: { id: string; name: string }[];
+}
+
 export interface WorkflowNode {
   id: string;
   type: NodeType;
   position: { x: number; y: number };
-  data: Record<string, any>;
+  data: NodeData;
 }
 
 /**

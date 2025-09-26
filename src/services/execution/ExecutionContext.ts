@@ -3,7 +3,7 @@
  * Handles variables, logging, and execution state
  */
 
-import type { DebugLogEntry, ExecutionContext as IExecutionContext } from '../../types';
+import type { DebugLogEntry, ExecutionContext as IExecutionContext, WorkflowNode, NodeInputs, NodeOutput } from '../../types';
 
 import logService from '../logService';
 

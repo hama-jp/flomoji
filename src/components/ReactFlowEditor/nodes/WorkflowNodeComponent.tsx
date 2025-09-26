@@ -6,14 +6,14 @@ import { Workflow } from '../../../types';
 import CustomNode from './CustomNode';
 
 const WorkflowNodeComponent = ({ id, data }: { id: string; data: any }) => {
-  const { updateNodeData, getWorkflowId } = useReactFlowStore.getState();
+  const { updateNodeData } = useReactFlowStore.getState();
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
 
   useEffect(() => {
     const allWorkflows = Object.values(workflowManagerService.getWorkflows());
-    const currentWorkflowId = getWorkflowId();
+    const currentWorkflowId = workflowManagerService.getCurrentWorkflowId();
     setWorkflows(allWorkflows.filter(wf => wf.id !== currentWorkflowId));
-  }, [getWorkflowId]);
+  }, []);
 
   const handleWorkflowChange = useCallback((event: React.ChangeEvent<HTMLSelectElement>) => {
     const workflowId = event.target.value;
@@ -35,14 +35,8 @@ const WorkflowNodeComponent = ({ id, data }: { id: string; data: any }) => {
     }
   }, [id, workflows, updateNodeData]);
 
-  const nodeDefinition = {
-    name: data.workflowName || 'Workflow',
-    icon: '🌊',
-    color: 'purple',
-  };
-
   return (
-    <CustomNode id={id} data={data} definition={nodeDefinition}>
+    <CustomNode id={id} data={data}>
       <div className="p-2">
         <select
           value={data.workflowId || ''}

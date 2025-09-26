@@ -3,9 +3,9 @@ import type { NodeInputs } from '../../types';
 import workflowManagerService from '../../services/workflowManagerService';
 import { NodeExecutionService } from '../../services/nodeExecutionService';
 
-import type { WorkflowNode } from '../../types';
+import type { WorkflowNode as WorkflowNodeData } from '../../types';
 
-export async function executeWorkflowNode(node: WorkflowNode, inputs: NodeInputs): Promise<any> {
+export async function executeWorkflowNode(node: WorkflowNodeData, inputs: NodeInputs): Promise<any> {
   const { workflowId } = node.data;
   if (!workflowId) {
     return { error: 'Workflow ID is not set' };
