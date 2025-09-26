@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import {
   Save, FolderOpen, FilePlus, Download, Upload, Edit3, Check, X,
   MoreHorizontal, Trash2, Copy, Play, Square, SkipForward, Bug,
-  Pause, RotateCcw, ChevronRight, Gauge
+  Pause, RotateCcw, ChevronRight, Gauge, Sparkles
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -334,6 +334,15 @@ const WorkflowToolbar = ({
 
       {/* Right side: Execution Controls */}
       <div className="flex items-center gap-2">
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={onOpenCopilot}
+          className="bg-gradient-to-r from-blue-500 to-purple-500 text-white hover:from-blue-600 hover:to-purple-600 hover:text-white"
+        >
+          <Sparkles className="h-4 w-4 mr-1.5" />
+          Copilot
+        </Button>
         <Button
           size="sm"
           variant={debugMode !== 'off' ? 'default' : 'outline'}
