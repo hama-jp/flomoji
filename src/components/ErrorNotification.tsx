@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { X, AlertCircle, AlertTriangle, Info, RefreshCw } from 'lucide-react';
-import { useErrorStore, ErrorDetails, ErrorSeverity, errorService } from '@/services/errorService';
+import { useErrorStore, ErrorDetails, ErrorSeverity } from '@/store/errorStore';
+import { errorService } from '@/services/errorService';
 import { Button } from './ui/button';
 import { cn } from '@/lib/utils';
 
