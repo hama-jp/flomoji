@@ -18,7 +18,7 @@ export const runFlomojiWorkflow = (workflowId: string, inputData: NodeInputs = {
       return reject(new Error(`Workflow with ID "${workflowId}" not found.`));
     }
 
-    const { nodes, connections } = workflow;
+    const { nodes, edges: connections } = workflow.flow;
     const executionService = new NodeExecutionService();
 
     executionService.startExecution(nodes, connections, inputData)

@@ -1,7 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { runFlomojiWorkflow } from './globalApi';
 import StorageService from './storageService';
-import { NodeExecutionService } from './nodeExecutionService'; // Import the (to be) mocked class
+import { NodeExecutionService } from './nodeExecutionService';
 import { Workflow } from '../types';
 
 // Auto-mock the modules. The calls are hoisted.
@@ -10,27 +10,28 @@ vi.mock('./nodeExecutionService');
 
 const sampleWorkflows: Record<string, Workflow> = {
   'hello-world': {
-    id: 'hello-world', name: 'Hello World', nodes: [], connections: [], schedule: null, lastRun: null,
+    id: 'hello-world',
+    name: 'Hello World',
+    flow: {
+      nodes: [],
+      edges: [],
+    },
   },
 };
 
 describe('runFlomojiWorkflow', () => {
-  // Declare variables to hold the mock functions
-  let mockStartExecution: vi.Mock;
+  let mockStartExecution: Mock;
   const mockExecutor = { next: vi.fn(), stop: vi.fn() };
 
   beforeEach(() => {
-    // Reset all mocks to ensure a clean state for each test
     vi.resetAllMocks();
 
-    // Define the mock implementation for NodeExecutionService for this test run
     mockStartExecution = vi.fn().mockResolvedValue(mockExecutor);
-    (NodeExecutionService as vi.Mock).mockImplementation(() => {
+    (NodeExecutionService as Mock).mockImplementation(() => {
       return { startExecution: mockStartExecution };
     });
 
-    // Define the mock implementation for StorageService for this test run
-    (StorageService.getWorkflows as vi.Mock).mockReturnValue(sampleWorkflows);
+    (StorageService.getWorkflows as Mock).mockReturnValue(sampleWorkflows);
   });
 
   it('should reject if workflowId is not found', async () => {
@@ -46,15 +47,15 @@ describe('runFlomojiWorkflow', () => {
     const finalVariables = { greeting: 'Hello, Jules!' };
 
     mockExecutor.next
-      .mockReset() // Reset from previous tests
+      .mockReset()
       .mockResolvedValueOnce({ done: false, value: { status: 'running' } })
       .mockResolvedValueOnce({ done: true, value: { status: 'completed', variables: finalVariables } });
 
     const result = await runFlomojiWorkflow(workflowId, inputData);
 
     expect(mockStartExecution).toHaveBeenCalledWith(
-      sampleWorkflows[workflowId].nodes,
-      sampleWorkflows[workflowId].connections,
+      sampleWorkflows[workflowId].flow.nodes,
+      sampleWorkflows[workflowId].flow.edges,
       inputData
     );
     expect(result).toEqual(finalVariables);
