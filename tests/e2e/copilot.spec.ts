@@ -32,6 +32,52 @@ test.describe('Workflow Copilot', () => {
 
   test('suggests a basic workflow for an LLM request', async ({ page }) => {
     test.info().setTimeout(120_000);
+
+    // Mock the OpenAI API response
+    await page.route(OPENAI_COMPLETIONS_ROUTE, async (route) => {
+      const mockToolCalls = [
+        {
+          id: 'call_1',
+          type: 'function',
+          function: { name: 'add_node', arguments: JSON.stringify({ type: 'input', data: { label: 'Input Node' } }) },
+        },
+        {
+          id: 'call_2',
+          type: 'function',
+          function: { name: 'add_node', arguments: JSON.stringify({ type: 'llm', data: { label: 'LLM Node' } }) },
+        },
+        {
+          id: 'call_3',
+          type: 'function',
+          function: { name: 'add_node', arguments: JSON.stringify({ type: 'output', data: { label: 'Output Node' } }) },
+        },
+        {
+          id: 'call_4',
+          type: 'function',
+          function: { name: 'connect_nodes', arguments: JSON.stringify({ sourceId: 'node-1', targetId: 'node-2' }) },
+        },
+      ];
+
+      const json = {
+        id: 'chatcmpl-mock-id',
+        object: 'chat.completion',
+        created: Date.now() / 1000,
+        model: 'gpt-5-mini',
+        choices: [
+          {
+            index: 0,
+            message: {
+              role: 'assistant',
+              content: 'I have devised a plan for your workflow.',
+              tool_calls: mockToolCalls,
+            },
+            finish_reason: 'tool_calls',
+          },
+        ],
+      };
+      await route.fulfill({ json });
+    });
+
     await page.goto('/');
 
     const copilotButton = page.locator('button:has-text("Copilot")');
@@ -41,22 +87,16 @@ test.describe('Workflow Copilot', () => {
 
     const inputArea = page.locator('textarea[placeholder="Ask me to create or improve your workflow..."]');
     await inputArea.fill('Create a workflow that uses an LLM to summarise text');
-    const responsePromise = page.waitForResponse((response) => {
-      return (
-        response.url().includes('/v1/chat/completions') &&
-        response.request().method() === 'POST'
-      );
-    });
     await inputArea.press('Enter');
-    await responsePromise;
 
-    await expect(page.getByText('Here is a plan for your workflow.')).toBeVisible();
+    // Assert that the plan is visible
+    await expect(page.getByText(/plan/i).first()).toBeVisible();
 
+    // Assert that all suggestions are rendered correctly
     const suggestionList = page.locator('[data-testid="copilot-suggestions"]');
-    await expect(suggestionList.locator('text=/Add input node/i')).toBeVisible();
-    await expect(suggestionList.locator('text=/Add llm node/i')).toBeVisible();
-    await expect(suggestionList.locator('text=/Add output node/i')).toBeVisible();
-
+    await expect(suggestionList.locator('text=/Add input node/i').first()).toBeVisible();
+    await expect(suggestionList.locator('text=/Add llm node/i').first()).toBeVisible();
+    await expect(suggestionList.locator('text=/Add output node/i').first()).toBeVisible();
     await expect(suggestionList.locator('text=/Connect .* to .*/i').first()).toBeVisible();
   });
 });

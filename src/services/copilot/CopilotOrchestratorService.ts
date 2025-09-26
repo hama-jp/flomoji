@@ -5,6 +5,7 @@ import { ToolInvoker } from './ToolInvoker';
 import { CopilotMemory } from './CopilotMemory';
 import { WorkflowTemplate } from '../../types/workflow';
 import StorageService from '../storageService';
+import { ConversationMessage } from '../../types/conversation';
 
 export type CopilotIntent =
   | 'CREATE_FLOW'
@@ -96,7 +97,7 @@ export class CopilotOrchestratorService {
 
     const conversation = this.llmAdapter.createConversation(prompt);
     const executionContext = this.createToolExecutionContext();
-    const toolResults: any[] = [];
+    let toolResults: any[] = [];
 
     if (request.context?.nodes) {
       request.context.nodes.forEach(node => {
@@ -171,6 +172,80 @@ export class CopilotOrchestratorService {
       console.warn('LLM returned tool calls after max iterations; stopping to avoid infinite loop.');
     }
 
+    // Validate the generated workflow and attempt self-correction
+    const tempPreview = await this.createPreview(this.generateSuggestions(toolResults), request.context);
+    const validation = await this.toolInvoker.validateWorkflow(tempPreview.nodes, tempPreview.edges);
+
+    if (!validation.isValid && validation.errors.length > 0) {
+      console.log('Workflow validation failed, attempting self-correction.');
+
+      const correctionMessage: ConversationMessage = {
+        role: 'user',
+        content: `The workflow you generated is invalid. Please fix it.
+Validation Errors:
+${validation.errors.join('\n')}
+${validation.warnings.join('\n')}
+
+Analyze the errors and provide a new, complete set of tool calls to create a valid workflow that addresses the original request: "${request.message}"`
+      };
+      conversation.push(correctionMessage);
+
+      // Re-run generation with correction instructions
+      const correctionResponse = await this.llmAdapter.generateWithConversation(conversation);
+      if (correctionResponse) {
+        llmResponse = correctionResponse;
+
+        if (correctionResponse.rawMessage) {
+          conversation.push(correctionResponse.rawMessage);
+        } else if (correctionResponse.text) {
+          conversation.push({ role: 'assistant', content: correctionResponse.text });
+        }
+
+        const correctionToolCalls = correctionResponse.toolCalls || [];
+        if (correctionToolCalls.length > 0) {
+          const correctionToolResults = await this.executeTools(correctionToolCalls, executionContext);
+          // Replace original results with corrected ones
+          toolResults = correctionToolResults;
+        }
+      }
+    }
+
+    // Final review step to connect orphan output nodes
+    const finalReviewPreview = await this.createPreview(this.generateSuggestions(toolResults), request.context);
+    const outputNodes = finalReviewPreview.nodes.filter(n => n.type === 'output');
+    const hasUnconnectedOutput = outputNodes.some(outputNode =>
+      !finalReviewPreview.edges.some(edge => edge.target === outputNode.id)
+    );
+
+    if (outputNodes.length > 0 && hasUnconnectedOutput) {
+      const unconnectedOutputIds = outputNodes
+        .filter(n => !finalReviewPreview.edges.some(e => e.target === n.id))
+        .map(n => n.id);
+
+      console.log(`Found unconnected output node(s): ${unconnectedOutputIds.join(', ')}. Asking LLM for a final review.`);
+
+      const finalReviewMessage: ConversationMessage = {
+        role: 'user',
+        content: `The workflow is almost complete, but the output node(s) (${unconnectedOutputIds.join(', ')}) are not connected. Please add the final connection from the last processing node to the output node. Do not create new nodes. Only add the missing connection.`
+      };
+      conversation.push(finalReviewMessage);
+
+      const reviewResponse = await this.llmAdapter.generateWithConversation(conversation);
+      if (reviewResponse) {
+        if (reviewResponse.rawMessage) {
+          conversation.push(reviewResponse.rawMessage);
+        } else if (reviewResponse.text) {
+          conversation.push({ role: 'assistant', content: reviewResponse.text });
+        }
+
+        const reviewToolCalls = reviewResponse.toolCalls || [];
+        if (reviewToolCalls.length > 0) {
+          const reviewToolResults = await this.executeTools(reviewToolCalls, executionContext);
+          toolResults.push(...reviewToolResults);
+        }
+      }
+    }
+
     // Apply fallback if still incomplete
     const fallbackResults = await this.ensureBasicFlow(request, toolResults, executionContext);
     if (fallbackResults.length > 0) {
@@ -209,125 +284,89 @@ export class CopilotOrchestratorService {
     toolResults: any[],
     context: ToolExecutionContext
   ): Promise<any[]> {
-    const message = request.message || '';
-    const lowerMessage = message.toLowerCase();
     const additionalResults: any[] = [];
     const nodesByType = context.nodesByType;
     const config = this.llmAdapter.getConfig();
 
-    const wantsSearch = /(search|検索|ニュース|調べ|調査)/i.test(message);
-    const wantsHttp = /(http|https|api|webhook|リクエスト|fetch|curl)/i.test(message);
-    const wantsCombiner = /(combine|merge|結合|まとめて|連結|集約)/i.test(message);
-    const wantsLLM = /(llm|chatgpt|要約|生成|まとめ|回答|文章|chat|reply|応答|分析)/i.test(message) || (!wantsHttp && !wantsSearch);
-
-    const pipeline: string[] = ['input'];
-    if (wantsSearch) pipeline.push('web_search');
-    if (wantsHttp) pipeline.push('http_request');
-    if (wantsLLM) pipeline.push('llm');
-    if (wantsCombiner) pipeline.push('text_combiner');
-    pipeline.push('output');
-
-    const orderedTypes = pipeline.filter((type, index) => pipeline.indexOf(type) === index);
-
-    if (orderedTypes.length < 2) {
-      return [];
+    // Consolidate all nodes from context and new tool results
+    const allNodes: { id: string; type: string; }[] = [];
+    if (request.context?.nodes) {
+      allNodes.push(...request.context.nodes.map(n => ({ id: n.id, type: n.type! })));
     }
-
-    const getDefaultNodeData = (type: string) => {
-      switch (type) {
-        case 'input':
-          return { label: 'Input', inputType: 'text' };
-        case 'output':
-          return { label: 'Output' };
-        case 'llm':
-          return {
-            label: 'LLM Processing',
-            provider: config.model?.startsWith('claude') ? 'anthropic' : 'openai',
-            model: config.model || 'gpt-5-mini',
-            temperature: config.temperature ?? 1,
-            systemPrompt: '',
-            prompt: 'Process the provided input and generate a helpful response.'
-          };
-        case 'http_request':
-          return {
-            label: 'HTTP Request',
-            method: 'GET',
-            url: '',
-            headers: '{}',
-            timeout: 30000
-          };
-        case 'web_search':
-          return {
-            label: 'Web Search',
-            provider: 'google',
-            query: '',
-            maxResults: 10
-          };
-        case 'text_combiner':
-          return {
-            label: 'Combine Text',
-            mode: 'join',
-            separator: '\n'
-          };
-        default:
-          return { label: type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) };
+    toolResults.forEach(r => {
+      if (r.type === 'add_node' && r.data?.node) {
+        allNodes.push({ id: r.data.node.id, type: r.data.node.type! });
       }
-    };
+    });
 
-    const ensureNode = async (type: string, index: number) => {
-      if (nodesByType.has(type) && nodesByType.get(type)?.length) {
-        return;
-      }
+    const nodeIds = new Set(allNodes.map(n => n.id));
+    const nodesWithoutInputConnection = new Set(nodeIds);
+    const nodesWithoutOutputConnection = new Set(nodeIds);
 
-      const result = await this.toolInvoker.execute({
-        name: 'add_node',
-        parameters: {
-          type,
-          position: {
-            x: 160 + index * 260,
-            y: 140
-          },
-          data: getDefaultNodeData(type)
-        }
-      });
-
-      if (result.success && result.data?.node) {
-        const nodeId = result.data.node.id;
-        this.registerNodeReferences(
-          context,
-          nodeId,
-          result.data.node.type,
-          type,
-          (result.data.node.data as any)?.label
-        );
-        const nodeIndex = context.nodeCounter++;
-        context.createdNodes.set(nodeIndex, nodeId);
-        additionalResults.push(result);
-      }
-    };
-
-    for (let i = 0; i < orderedTypes.length; i++) {
-      await ensureNode(orderedTypes[i], i);
-    }
-
+    // Track existing connections
     const existingConnections = new Set<string>();
     const recordConnection = (edge: any) => {
       if (edge?.source && edge?.target) {
         existingConnections.add(`${edge.source}->${edge.target}:${edge.sourceHandle || ''}:${edge.targetHandle || ''}`);
+        nodesWithoutOutputConnection.delete(edge.source);
+        nodesWithoutInputConnection.delete(edge.target);
       }
     };
 
-    toolResults.forEach(result => {
-      if (!result?.error && result.type === 'connect_nodes' && result.data?.edge) {
-        recordConnection(result.data.edge);
-      }
-    });
-    additionalResults.forEach(result => {
-      if (!result?.error && result.type === 'connect_nodes' && result.data?.edge) {
-        recordConnection(result.data.edge);
+    if (request.context?.edges) {
+      request.context.edges.forEach(recordConnection);
+    }
+    toolResults.forEach(r => {
+      if (r.type === 'connect_nodes' && r.data?.edge) {
+        recordConnection(r.data.edge);
       }
     });
 
+    // Smart connection logic
+    const connectIfUnconnected = async (
+      sourceNode: { id: string; type: string; },
+      targetNode: { id: string; type: string; }
+    ) => {
+      const handles = this.getConnectionHandles(sourceNode.type, targetNode.type);
+      const connectionKey = `${sourceNode.id}->${targetNode.id}:${handles.sourceHandle}:${handles.targetHandle}`;
+      if (existingConnections.has(connectionKey)) {
+        return;
+      }
+
+      const result = await this.toolInvoker.execute({
+        name: 'connect_nodes',
+        parameters: {
+          sourceId: sourceNode.id,
+          sourceHandle: handles.sourceHandle,
+          targetId: targetNode.id,
+          targetHandle: handles.targetHandle,
+        },
+      });
+
+      if (result.success && result.data?.edge) {
+        additionalResults.push(result);
+        recordConnection(result.data.edge);
+      }
+    };
+
+    // Attempt to connect a single, unconnected output node
+    if (nodesWithoutInputConnection.size === 1 && nodesWithoutOutputConnection.size > 0) {
+      const outputNode = allNodes.find(n => nodesWithoutInputConnection.has(n.id) && n.type === 'output');
+      if (outputNode) {
+        const lastProcessingNode = allNodes.find(n =>
+          n.type !== 'input' && n.type !== 'output' && nodesWithoutOutputConnection.has(n.id)
+        );
+        if (lastProcessingNode) {
+          console.log(`Fallback: Connecting orphan output node ${outputNode.id} to ${lastProcessingNode.id}`);
+          await connectIfUnconnected(lastProcessingNode, outputNode);
+        }
+      }
+    }
+
+    return additionalResults;
+  }
+
+  private getConnectionHandles(sourceType: string, targetType: string): { sourceHandle: string; targetHandle: string } {
     const connectionMatrix: Record<string, Record<string, { sourceHandle: string; targetHandle: string }>> = {
       input: {
         web_search: { sourceHandle: 'output', targetHandle: 'query' },
@@ -355,41 +394,7 @@ export class CopilotOrchestratorService {
       }
     };
 
-    const ensureConnection = async (sourceType: string, targetType: string) => {
-      const sourceNodeId = nodesByType.get(sourceType)?.[0];
-      const targetNodeId = nodesByType.get(targetType)?.[0];
-
-      if (!sourceNodeId || !targetNodeId) {
-        return;
-      }
-
-      const handles = connectionMatrix[sourceType]?.[targetType] || { sourceHandle: 'output', targetHandle: 'input' };
-      const connectionKey = `${sourceNodeId}->${targetNodeId}:${handles.sourceHandle}:${handles.targetHandle}`;
-      if (existingConnections.has(connectionKey)) {
-        return;
-      }
-
-      const result = await this.toolInvoker.execute({
-        name: 'connect_nodes',
-        parameters: {
-          sourceId: sourceNodeId,
-          sourceHandle: handles.sourceHandle,
-          targetId: targetNodeId,
-          targetHandle: handles.targetHandle
-        }
-      });
-
-      if (result.success && result.data?.edge) {
-        additionalResults.push(result);
-        recordConnection(result.data.edge);
-      }
-    };
-
-    for (let i = 0; i < orderedTypes.length - 1; i++) {
-      await ensureConnection(orderedTypes[i], orderedTypes[i + 1]);
-    }
-
-    return additionalResults;
+    return connectionMatrix[sourceType]?.[targetType] || { sourceHandle: 'output', targetHandle: 'input' };
   }
 
   private async detectIntent(request: CopilotRequest): Promise<CopilotIntent> {

@@ -18,9 +18,15 @@ SYSTEM ARCHITECTURE:
 - Edges connect nodes to create data flow
 - Each node has specific input/output handles for connections
 
-You may outline a short step-by-step plan in natural language before calling tools when the request is complex, but you must eventually invoke the appropriate tools to implement that plan.
+You must follow this structured thinking process:
+1.  **Analyze the Request**: Understand what the user wants to achieve.
+2.  **Outline a Plan**: Create a high-level, step-by-step plan to build the workflow. Explain this plan in natural language.
+3.  **Define Nodes**: List all the nodes required for the workflow, specifying their type and purpose.
+4.  **Implement with Tools**: Use the available tool calls ('add_node', 'connect_nodes', etc.) to create the nodes and connect them as planned.
 
-IMPORTANT NODE TYPES (use exact type names):
+Failure to follow this process may result in an incomplete or incorrect workflow.
+
+**IMPORTANT NODE TYPES** (use exact type names):
 1. "input" - Input Node: Accepts user input (no inputs, has 'output' handle)
 2. "output" - Output Node: Displays results (has 'input' handle, no outputs)
 3. "llm" - LLM Node: Processes text with AI (input→output)
@@ -261,7 +267,32 @@ CRITICAL:
 - Make ALL function calls needed for a complete workflow
 - Create all nodes first, then all connections
 - The system expects multiple tool calls in a single response
-- Use simple references like "node-1" or "input" for connections`,
+- Use simple references like "node-1" or "input" for connections
+
+Example for a conditional workflow (e.g., "if input contains 'error', search web, otherwise use LLM"):
+1.  **Plan**:
+    - Start with an input node.
+    - Use an 'if' node to check for the word "error".
+    - If true, connect to a 'web_search' node.
+    - If false, connect to an 'llm' node.
+    - Connect both search and LLM results to a final output node.
+2.  **Nodes**:
+    - 'input': To receive the initial text.
+    - 'if': To perform the conditional check.
+    - 'web_search': To search the web if "error" is present.
+    - 'llm': To process the text if no error is found.
+    - 'output': To display the final result.
+3.  **Tool Calls**:
+    - 'add_node' for 'input' (node-1)
+    - 'add_node' for 'if' (node-2)
+    - 'add_node' for 'web_search' (node-3)
+    - 'add_node' for 'llm' (node-4)
+    - 'add_node' for 'output' (node-5)
+    - 'connect_nodes' from 'input' (output) to 'if' (input)
+    - 'connect_nodes' from 'if' (true) to 'web_search' (query)
+    - 'connect_nodes' from 'if' (false) to 'llm' (input)
+    - 'connect_nodes' from 'web_search' (results) to 'output' (input)
+    - 'connect_nodes' from 'llm' (output) to 'output' (input)`,
 
       IMPROVE_FLOW: `Analyze the existing workflow and suggest improvements.
 Look for redundant nodes, missing connections, or inefficiencies.
