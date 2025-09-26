@@ -1,45 +1,20 @@
-import React, { useState, useRef, useLayoutEffect } from 'react';
-
+import React, { useState, useRef } from 'react';
 import {
-  Save,
-  FolderOpen,
-  FilePlus,
-  Download,
-  Upload,
-  Edit3,
-  Check,
-  X,
-  MoreHorizontal,
-  Trash2,
-  Copy,
-  Play,
-  Square,
-  SkipForward,
-  Bug,
-  Pause,
-  RotateCcw,
-  ChevronRight,
-  Gauge
+  Save, FolderOpen, FilePlus, Download, Upload, Edit3, Check, X,
+  MoreHorizontal, Trash2, Copy, Play, Square, SkipForward, Bug,
+  Pause, RotateCcw, ChevronRight, Gauge
 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
+  Dialog, DialogContent, DialogDescription, DialogFooter,
+  DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 
@@ -78,7 +53,6 @@ const WorkflowToolbar = ({
   onImport,
   onDuplicate,
   hasUnsavedChanges = false,
-  // Execution controls
   onRunAll,
   onStop,
   onStepForward,
@@ -91,61 +65,20 @@ const WorkflowToolbar = ({
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
-  const SNAP_TOP = 8; // px offset from very top when snapped
-  const SNAP_THRESHOLD = 40; // distance from top to trigger magnet
-  const EDGE_PADDING = 20;
-  const DEFAULT_WIDTH = 420;
 
-  const dragRef = useRef<HTMLDivElement>(null);
-  const [toolbarWidth, setToolbarWidth] = useState(DEFAULT_WIDTH);
-
-  const computeMaxX = (width: number = toolbarWidth) => Math.max(EDGE_PADDING, window.innerWidth - width - EDGE_PADDING);
-
-  const [position, setPosition] = useState({
-    x: computeMaxX(DEFAULT_WIDTH),
-    y: SNAP_TOP
-  });
-  const [isDragging, setIsDragging] = useState(false);
- 
-  useLayoutEffect(() => {
-    const measureAndSnap = () => {
-      const width = dragRef.current?.offsetWidth || DEFAULT_WIDTH;
-      setToolbarWidth(width);
-      setPosition(prev => ({
-        x: Math.max(EDGE_PADDING, Math.min(window.innerWidth - width - EDGE_PADDING, prev.x)),
-        y: prev.y <= SNAP_THRESHOLD ? SNAP_TOP : Math.min(prev.y, window.innerHeight - 80)
-      }));
-    };
-
-    measureAndSnap();
-    window.addEventListener('resize', measureAndSnap);
-    return () => window.removeEventListener('resize', measureAndSnap);
-  }, []);
-
-  // Snapping configuration (keep draggable but gently magnetise to top band)
-
-  // Debugger state
   const {
-    debugMode,
-    setDebugMode,
-    executionStatus,
-    setExecutionStatus,
-    executionSpeed,
-    setExecutionSpeed,
-    clearExecutionHistory,
-    stepForward: debugStepForward,
-    abortExecution
+    debugMode, setDebugMode, executionStatus, setExecutionStatus,
+    executionSpeed, setExecutionSpeed, clearExecutionHistory,
+    stepForward: debugStepForward, abortExecution
   } = useDebuggerStore();
 
-  // Map speed preset strings to numeric delays (in milliseconds)
   const speedPresets = {
-    slow: 1000,    // 1 second delay
-    normal: 500,   // 500ms delay
-    fast: 100,     // 100ms delay
-    instant: 0     // No delay
+    slow: 1000,
+    normal: 500,
+    fast: 100,
+    instant: 0
   };
 
-  // Get the current speed preset from numeric value
   const getCurrentSpeedPreset = () => {
     if (executionSpeed >= 1000) return 'slow';
     if (executionSpeed >= 500) return 'normal';
@@ -205,7 +138,7 @@ const WorkflowToolbar = ({
     const file = event.target.files?.[0];
     if (file) {
       onImport?.(file);
-      event.target.value = ''; // Reset input
+      event.target.value = '';
     }
   };
 
@@ -226,253 +159,183 @@ const WorkflowToolbar = ({
   const formatDate = (dateString: string) => {
     if (!dateString) return 'Unknown';
     return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+      month: 'short', day: 'numeric', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
     });
   };
 
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('input')) return;
-    setIsDragging(true);
-    if (!dragRef.current) return;
-    const rect = dragRef.current.getBoundingClientRect();
-    const offsetX = e.clientX - rect.left;
-    const offsetY = e.clientY - rect.top;
-    
-    const handleMouseMove = (e: MouseEvent) => {
-      e.preventDefault();
-
-      const width = dragRef.current?.offsetWidth || toolbarWidth;
-      const maxX = computeMaxX(width);
-
-      let newX = e.clientX - offsetX;
-      let newY = e.clientY - offsetY;
-
-      newX = Math.max(EDGE_PADDING, Math.min(maxX, newX));
-      newY = Math.max(0, Math.min(window.innerHeight - 80, newY));
-
-      if (newY <= SNAP_THRESHOLD) {
-        newY = SNAP_TOP;
-      }
-
-      setPosition({ x: newX, y: newY });
-    };
-    
-    const handleMouseUp = () => {
-      setIsDragging(false);
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-      // Snap to top if released near upper edge
-      setPosition(prev => {
-        if (prev.y <= SNAP_THRESHOLD) {
-          const width = dragRef.current?.offsetWidth || toolbarWidth;
-          return {
-            x: Math.max(EDGE_PADDING, Math.min(computeMaxX(width), prev.x)),
-            y: SNAP_TOP
-          };
-        }
-        return prev;
-      });
-    };
-    
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-  };
-
   return (
-    <div 
-      ref={dragRef}
-      className={`fixed z-50 bg-white/95 backdrop-blur-sm rounded-xl shadow-xl border border-gray-200/60 p-3 flex items-center gap-3 min-w-fit max-w-4xl select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
-      style={{ left: position.x, top: position.y }}
-      onMouseDown={handleMouseDown}
-    >
-      {/* Drag Handle & Workflow Name & Status */}
-      <div className="flex items-center gap-3">
-        {/* Drag Handle */}
-        <div className="flex flex-col gap-1 opacity-40 hover:opacity-60 cursor-grab">
-          <div className="w-1 h-1 bg-gray-400 rounded-full"></div>
-          <div className="w-1 h-1 bg-gray-400 rounded-full"></div>
-          <div className="w-1 h-1 bg-gray-400 rounded-full"></div>
-        </div>
-        
+    <div className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-sm border-b border-gray-200/60 px-4 py-2 flex items-center justify-between shadow-sm">
+      {/* Left side: Workflow Management */}
+      <div className="flex items-center gap-4">
         <div className="flex items-center gap-2">
-        {isRenaming ? (
-          <div className="flex items-center gap-1">
-            <Input
-              ref={renameInputRef}
-              value={newName}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewName(e.target.value)}
-              onKeyDown={(e: React.KeyboardEvent) => {
-                if (e.key === 'Enter') handleConfirmRename();
-                if (e.key === 'Escape') handleCancelRename();
-              }}
-              onBlur={handleConfirmRename}
-              className="h-7 w-48 text-sm"
-            />
-            <Button size={'sm' as const} variant={'ghost' as const} onClick={handleConfirmRename} className="h-7 w-7 p-0">
-              <Check className="h-3 w-3" />
-            </Button>
-            <Button size={'sm' as const} variant={'ghost' as const} onClick={handleCancelRename} className="h-7 w-7 p-0">
-              <X className="h-3 w-3" />
-            </Button>
-          </div>
-        ) : (
-          <div className="flex items-center gap-2">
-            <span className="font-medium text-sm text-gray-900">
-              {currentWorkflow?.name || 'Untitled Workflow'}
-            </span>
-            {hasUnsavedChanges && (
-              <Badge className="text-xs px-1.5 py-0.5" variant={"default" as const}>
-                unsaved
-              </Badge>
-            )}
-            <Button
-              size={'sm' as const}
-              variant={'ghost' as const}
-              onClick={handleStartRename}
-              className="h-6 w-6 p-0 opacity-60 hover:opacity-100"
-            >
-              <Edit3 className="h-3 w-3" />
-            </Button>
-          </div>
-        )}
+          {isRenaming ? (
+            <div className="flex items-center gap-1">
+              <Input
+                ref={renameInputRef}
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleConfirmRename();
+                  if (e.key === 'Escape') handleCancelRename();
+                }}
+                onBlur={handleConfirmRename}
+                className="h-8 w-48 text-sm"
+              />
+              <Button size="sm" variant="ghost" onClick={handleConfirmRename} className="h-8 w-8 p-0">
+                <Check className="h-4 w-4" />
+              </Button>
+              <Button size="sm" variant="ghost" onClick={handleCancelRename} className="h-8 w-8 p-0">
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-gray-900">
+                {currentWorkflow?.name || 'Untitled Workflow'}
+              </span>
+              {hasUnsavedChanges && (
+                <Badge className="text-xs px-1.5 py-0.5" variant="default">
+                  unsaved
+                </Badge>
+              )}
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={handleStartRename}
+                className="h-6 w-6 p-0 opacity-60 hover:opacity-100"
+              >
+                <Edit3 className="h-3 w-3" />
+              </Button>
+            </div>
+          )}
+        </div>
+
+        <div className="w-px h-6 bg-gray-300" />
+
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" onClick={handleSave} disabled={!hasUnsavedChanges}>
+            <Save className="h-4 w-4 mr-1.5" />
+            Save
+          </Button>
+
+          <Dialog open={showLoadDialog} onOpenChange={setShowLoadDialog}>
+            <DialogTrigger asChild>
+              <Button size="sm" variant="outline">
+                <FolderOpen className="h-4 w-4 mr-1.5" />
+                Load
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Load Workflow</DialogTitle>
+                <DialogDescription>
+                  Choose a workflow to load. Your current unsaved changes will be lost.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="max-h-96 overflow-y-auto space-y-2">
+                {workflows.length > 0 ? (
+                  workflows.map((workflow: any) => (
+                    <div
+                      key={workflow.id}
+                      className={`flex items-center justify-between p-3 rounded-lg border hover:bg-gray-50 cursor-pointer ${
+                        workflow.id === currentWorkflow?.id ? 'bg-blue-50 border-blue-200' : 'border-gray-200'
+                      }`}
+                      onClick={() => handleLoad(workflow.id)}
+                    >
+                      <div>
+                        <h4 className="font-medium text-sm">{workflow.name}</h4>
+                        <p className="text-xs text-gray-500">
+                          {workflow.flow?.nodes?.length || 0} nodes • Modified {formatDate(workflow.lastModified)}
+                        </p>
+                      </div>
+                      {workflow.id === currentWorkflow?.id && (
+                        <Badge className="text-xs" variant="default">Current</Badge>
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    <FolderOpen className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <p>No workflows found</p>
+                  </div>
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+            <DialogTrigger asChild>
+              <Button size="sm" variant="outline">
+                <FilePlus className="h-4 w-4 mr-1.5" />
+                New
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Create New Workflow</DialogTitle>
+                <DialogDescription>
+                  Enter a name for your new workflow. Your current workflow will be saved automatically.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="py-4">
+                <Input
+                  type="text"
+                  placeholder="Enter workflow name..."
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleCreateNew()}
+                />
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleCreateNew} disabled={!newName.trim()}>
+                  Create Workflow
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" variant="outline">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={handleDuplicate}>
+                <Copy className="h-4 w-4 mr-2" />
+                Duplicate Workflow
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleExport}>
+                <Download className="h-4 w-4 mr-2" />
+                Export to File
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleImportClick}>
+                <Upload className="h-4 w-4 mr-2" />
+                Import from File
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => handleDelete(currentWorkflow?.id)}
+                className="text-red-600"
+                disabled={workflows.length <= 1}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete Workflow
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
-      <div className="w-px h-6 bg-gray-300" />
-
-      {/* Main Actions */}
-      <div className="flex items-center gap-1 cursor-auto">
-        <Button size={'sm' as const} variant={'outline' as const} onClick={handleSave} disabled={!hasUnsavedChanges}>
-          <Save className="h-4 w-4 mr-1.5" />
-          Save
-        </Button>
-
-        {/* Load Workflow Dialog */}
-        <Dialog open={showLoadDialog} onOpenChange={setShowLoadDialog}>
-          <DialogTrigger asChild>
-            <Button size={'sm' as const} variant={'outline' as const}>
-              <FolderOpen className="h-4 w-4 mr-1.5" />
-              Load
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Load Workflow</DialogTitle>
-              <DialogDescription>
-                Choose a workflow to load. Your current unsaved changes will be lost.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="max-h-96 overflow-y-auto space-y-2">
-              {workflows.length > 0 ? (
-                workflows.map((workflow: any) => (
-                  <div
-                    key={workflow.id}
-                    className={`flex items-center justify-between p-3 rounded-lg border hover:bg-gray-50 cursor-pointer ${
-                      workflow.id === currentWorkflow?.id ? 'bg-blue-50 border-blue-200' : 'border-gray-200'
-                    }`}
-                    onClick={() => handleLoad(workflow.id)}
-                  >
-                    <div>
-                      <h4 className="font-medium text-sm">{workflow.name}</h4>
-                      <p className="text-xs text-gray-500">
-                        {workflow.flow?.nodes?.length || 0} nodes • Modified {formatDate(workflow.lastModified)}
-                      </p>
-                    </div>
-                    {workflow.id === currentWorkflow?.id && (
-                      <Badge className="text-xs" variant={"default" as const}>Current</Badge>
-                    )}
-                  </div>
-                ))
-              ) : (
-                <div className="text-center py-8 text-gray-500">
-                  <FolderOpen className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p>No workflows found</p>
-                </div>
-              )}
-            </div>
-          </DialogContent>
-        </Dialog>
-
-        {/* Create New Dialog */}
-        <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-          <DialogTrigger asChild>
-            <Button size={'sm' as const} variant={'outline' as const}>
-              <FilePlus className="h-4 w-4 mr-1.5" />
-              New
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Create New Workflow</DialogTitle>
-              <DialogDescription>
-                Enter a name for your new workflow. Your current workflow will be saved automatically.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="py-4">
-              <Input
-                type="text"
-                placeholder="Enter workflow name..."
-                value={newName}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewName(e.target.value)}
-                onKeyDown={(e: React.KeyboardEvent) => e.key === 'Enter' && handleCreateNew()}
-              />
-            </div>
-            <DialogFooter>
-              <Button variant={'outline' as const} size={"default" as const} onClick={() => setShowCreateDialog(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleCreateNew} disabled={!newName.trim()}>
-                Create Workflow
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* File Operations Menu */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button size={'sm' as const} variant={'outline' as const}>
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={handleDuplicate}>
-              <Copy className="h-4 w-4 mr-2" />
-              Duplicate Workflow
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleExport}>
-              <Download className="h-4 w-4 mr-2" />
-              Export to File
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleImportClick}>
-              <Upload className="h-4 w-4 mr-2" />
-              Import from File
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem 
-              onClick={() => handleDelete(currentWorkflow?.id)}
-              className="text-red-600"
-              disabled={workflows.length <= 1}
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Delete Workflow
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-
-      <div className="w-px h-6 bg-gray-300" />
-
-      {/* Execution Controls */}
-      <div className="flex items-center gap-2 cursor-auto">
-        {/* Debug Mode Toggle */}
+      {/* Right side: Execution Controls */}
+      <div className="flex items-center gap-2">
         <Button
-          size={'sm' as const}
+          size="sm"
           variant={debugMode !== 'off' ? 'default' : 'outline'}
           onClick={() => setDebugMode(debugMode === 'off' ? 'step' : 'off')}
           className={cn(
@@ -486,12 +349,11 @@ const WorkflowToolbar = ({
 
         {debugMode !== 'off' ? (
           <>
-            {/* Debug Controls */}
-            <div className="flex items-center gap-1 px-2 py-1 bg-orange-50 rounded-lg">
+            <div className="flex items-center gap-1 px-2 py-1 bg-orange-50 rounded-lg border border-orange-200">
               {executionStatus !== 'running' ? (
                 <Button
-                  size={'sm' as const}
-                  variant={'ghost' as const}
+                  size="sm"
+                  variant="ghost"
                   onClick={() => {
                     setExecutionStatus('running');
                     onRunAll?.();
@@ -504,8 +366,8 @@ const WorkflowToolbar = ({
                 </Button>
               ) : (
                 <Button
-                  size={'sm' as const}
-                  variant={'ghost' as const}
+                  size="sm"
+                  variant="ghost"
                   onClick={() => setExecutionStatus('paused')}
                   className="h-7 text-orange-600 hover:bg-orange-100"
                   title="Pause"
@@ -515,8 +377,8 @@ const WorkflowToolbar = ({
               )}
 
               <Button
-                size={'sm' as const}
-                variant={'ghost' as const}
+                size="sm"
+                variant="ghost"
                 onClick={() => {
                   if (executionStatus === 'paused') {
                     debugStepForward();
@@ -531,8 +393,8 @@ const WorkflowToolbar = ({
               </Button>
 
               <Button
-                size={'sm' as const}
-                variant={'ghost' as const}
+                size="sm"
+                variant="ghost"
                 onClick={() => {
                   abortExecution();
                   clearExecutionHistory();
@@ -547,7 +409,6 @@ const WorkflowToolbar = ({
 
               <div className="w-px h-5 bg-gray-300 mx-1" />
 
-              {/* Speed Control */}
               <div className="flex items-center gap-1">
                 <Gauge className="h-4 w-4 text-gray-500" />
                 <select
@@ -556,7 +417,7 @@ const WorkflowToolbar = ({
                     const preset = e.target.value as keyof typeof speedPresets;
                     setExecutionSpeed(speedPresets[preset]);
                   }}
-                  className="text-xs px-1 py-0.5 border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-orange-500"
+                  className="text-xs px-1 py-0.5 border border-gray-200 rounded bg-white focus:outline-none focus:ring-1 focus:ring-orange-500"
                 >
                   <option value="slow">Slow</option>
                   <option value="normal">Normal</option>
@@ -566,7 +427,6 @@ const WorkflowToolbar = ({
               </div>
             </div>
 
-            {/* Execution Status Indicator */}
             {executionStatus !== 'idle' && (
               <Badge
                 className={cn(
@@ -587,10 +447,9 @@ const WorkflowToolbar = ({
             )}
           </>
         ) : (
-          /* Normal Execution Controls */
           <>
             <Button
-              size={'sm' as const}
+              size="sm"
               onClick={onRunAll}
               disabled={isExecuting}
               className="bg-green-600 hover:bg-green-700 text-white"
@@ -600,8 +459,8 @@ const WorkflowToolbar = ({
             </Button>
 
             <Button
-              size={'sm' as const}
-              variant={'outline' as const}
+              size="sm"
+              variant="outline"
               onClick={onStop}
               disabled={!isExecuting}
             >
@@ -610,8 +469,8 @@ const WorkflowToolbar = ({
             </Button>
 
             <Button
-              size={'sm' as const}
-              variant={'outline' as const}
+              size="sm"
+              variant="outline"
               onClick={onStepForward}
               disabled={isExecuting}
             >
@@ -622,8 +481,6 @@ const WorkflowToolbar = ({
         )}
       </div>
 
-
-      {/* Hidden file input */}
       <input
         ref={fileInputRef}
         type="file"
