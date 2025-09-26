@@ -13,14 +13,21 @@ async function executeInputNode(
   inputs: NodeInputs,
   context?: INodeExecutionContext
 ): Promise<NodeOutput> {
+  const inputName = node.data.name || 'input';
+  const initialValue = context ? context.getVariable(inputName) : undefined;
+
+  // Prioritize initial data from the context, falling back to the node's static value.
+  const value = initialValue !== undefined ? initialValue : node.data.value || '';
+
   if (node.data.inputType === 'file') {
-    const value = node.data.fileContent || '';
+    // Note: File handling logic might need adjustments if used with context variables.
+    const fileContent = node.data.fileContent || value;
     if (context) {
-      context.setVariable(node.id, value);
+      context.setVariable(node.id, fileContent);
     }
-    return value;
+    return fileContent;
   }
-  const value = node.data.value || '';
+
   if (context) {
     context.setVariable(node.id, value);
   }

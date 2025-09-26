@@ -13,7 +13,7 @@ import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 
 import workflowManagerService from '../services/workflowManagerService';
-import type { NodeData } from '../types/nodes';
+import type { NodeData } from '../types';
 
 // Undo/Redo用の履歴状態
 interface HistoryState {

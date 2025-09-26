@@ -24,6 +24,7 @@ import VariableSetNode from './VariableSetNode';
 import WebAPINode from './WebAPINode';
 import WebSearchNode from './WebSearchNode';
 import WhileNode from './WhileNode';
+import WorkflowNode from './WorkflowNode';
 
 /**
  * 全てのノードタイプの定義を統合
@@ -47,7 +48,8 @@ export const nodeTypes: Record<string, ExtendedNodeDefinition> = {
   http_request: HTTPRequestNode,
   web_search: WebSearchNode,
   code_execution: CodeExecutionNode,
-  web_api: WebAPINode
+  web_api: WebAPINode,
+  workflow: WorkflowNode,
 };
 
 /**
@@ -81,7 +83,8 @@ export const nodesByCategory: Record<string, { name: string; nodes: Record<strin
     nodes: {
       if: IfNode,
       while: WhileNode,
-      schedule: ScheduleNode
+      schedule: ScheduleNode,
+      workflow: WorkflowNode,
     }
   },
   'external': {

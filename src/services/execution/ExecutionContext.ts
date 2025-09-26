@@ -3,7 +3,7 @@
  * Handles variables, logging, and execution state
  */
 
-import type { DebugLogEntry, ExecutionContext as IExecutionContext } from '../../types';
+import type { DebugLogEntry, ExecutionContext as IExecutionContext, WorkflowNode, NodeInputs, NodeOutput } from '../../types';
 
 import logService from '../logService';
 
@@ -11,6 +11,7 @@ export interface ExecutionContextOptions {
   debugMode?: boolean;
   workflowId?: string;
   inputData?: Record<string, any>;
+  nodes?: WorkflowNode[];
 }
 
 export class ExecutionContext {

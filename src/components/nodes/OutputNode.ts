@@ -14,13 +14,18 @@ async function executeOutputNode(
   context?: INodeExecutionContext
 ): Promise<NodeOutput> {
   const format = node.data.format || 'text';
-  // Get the first available input value, or fallback to empty string
   const inputValue = Object.values(inputs)[0] || '';
+  const outputName = node.data.name || 'output';
+
+  // Set the output value as a variable in the execution context
+  if (context) {
+    context.setVariable(outputName, inputValue);
+  }
   
   switch (format) {
     case 'json':
       try {
-        return JSON.stringify({ output: inputValue }, null, 2);
+        return JSON.stringify({ [outputName]: inputValue }, null, 2);
       } catch {
         return inputValue;
       }

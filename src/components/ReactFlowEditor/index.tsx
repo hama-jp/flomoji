@@ -35,6 +35,7 @@ import VariableSetNodeComponent from './nodes/VariableSetNodeComponent';
 import WebSearchNodeComponent from './nodes/WebSearchNodeComponent';
 import WebAPINodeComponent from './nodes/WebAPINodeComponent';
 import WhileNodeComponent from './nodes/WhileNodeComponent';
+import WorkflowNodeComponent from './nodes/WorkflowNodeComponent';
 import StructuredExtractionNodeComponent from './nodes/StructuredExtractionNodeComponent';
 import SchemaValidatorNodeComponent from './nodes/SchemaValidatorNodeComponent';
 
@@ -86,6 +87,7 @@ const nodeTypes = {
   web_search: WebSearchNodeComponent,
   code_execution: CodeExecutionNodeComponent,
   web_api: WebAPINodeComponent,
+  workflow: WorkflowNodeComponent,
   structured_extraction: StructuredExtractionNodeComponent,
   schema_validator: SchemaValidatorNodeComponent,
   // 他の未実装ノードタイプはCustomNodeで処理
