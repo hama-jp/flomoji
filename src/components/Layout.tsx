@@ -232,18 +232,6 @@ const Layout = ({ children, currentView, onViewChange, editingNode, onEditingNod
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <h1 className="text-xl font-bold text-gray-800">🌊 flomoji</h1>
-                  {currentView === 'workflow' && onOpenCopilot && (
-                    <Button
-                      variant={'default'}
-                      size={'sm'}
-                      onClick={onOpenCopilot}
-                      className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white shadow-md"
-                      title="Open Workflow Copilot - AI Assistant"
-                    >
-                      <Sparkles className="h-4 w-4 mr-1" />
-                      Copilot
-                    </Button>
-                  )}
                 </div>
                 <Button variant={'ghost'} size={'sm'} onClick={() => setSidebarOpen(false)} className="md:hidden"><X className="h-4 w-4" /></Button>
               </div>
