@@ -107,11 +107,40 @@ class WorkflowManagerService {
   }
 
   /**
-   * Get a specific workflow by ID
+   * Get a specific workflow by ID, with data migration for old formats
    */
   getWorkflow(id: string): Workflow | null {
     const workflows = this.getWorkflows();
-    return workflows[id] || null;
+    const workflow = workflows[id] || null;
+
+    if (!workflow) {
+      return null;
+    }
+
+    // Data migration for old format
+    // Old format: { id, name, nodes, connections, lastModified }
+    // New format: { id, name, flow: { nodes, edges, viewport }, lastModified }
+    const wfAsAny = workflow as any;
+    if (workflow && !workflow.flow && (wfAsAny.nodes || wfAsAny.connections)) {
+      logger.info(`Migrating old workflow format for: ${workflow.name}`);
+      const migratedWorkflow: Workflow = {
+        ...workflow,
+        flow: {
+          nodes: wfAsAny.nodes || [],
+          edges: (wfAsAny.connections || []).map((c: any) => ({ ...c, type: 'custom' })),
+          viewport: { x: 0, y: 0, zoom: 1 }
+        }
+      };
+      // Clean up old top-level properties
+      delete (migratedWorkflow as any).nodes;
+      delete (migratedWorkflow as any).connections;
+
+      // Save the migrated workflow back to storage to prevent re-migration
+      this.saveWorkflow(migratedWorkflow);
+      return migratedWorkflow;
+    }
+
+    return workflow;
   }
 
   /**
@@ -122,6 +151,12 @@ class WorkflowManagerService {
       logger.error("Invalid workflow data provided to saveWorkflow");
       return;
     }
+    // Add detailed logging to check the structure being saved
+    logger.info(`Saving workflow: ${workflowData.name}`, {
+      hasFlow: !!workflowData.flow,
+      nodeCount: workflowData.flow?.nodes?.length || 0,
+      edgeCount: workflowData.flow?.edges?.length || 0
+    });
     const workflows = this.getWorkflows();
     workflows[workflowData.id] = {
       ...workflowData,

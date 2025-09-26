@@ -3,7 +3,6 @@
  * Main service for workflow execution orchestration
  */
 
-import { nodeTypes } from '../components/nodes/index';
 import type { DebugLogEntry, NodeConnection, NodeDefinition, NodeExecutionState, WorkflowNode, NodeInputs } from '../types';
 
 import StorageService from './storageService';
@@ -22,7 +21,7 @@ export class NodeExecutionService {
   private isExecuting: boolean = false;
   private executor: ExecutionGenerator | null = null;
   private context: ExecutionContext | null = null;
-  private nodeTypesRegistry: Record<string, any> = nodeTypes;
+  private nodeTypesRegistry: Record<string, any> = {};
 
   /**
    * Check if execution is running
@@ -103,9 +102,12 @@ export class NodeExecutionService {
       throw new Error('ワークフローが既に実行中です');
     }
 
-    // Set node types if provided
+    // Set node types if provided, otherwise load dynamically
     if (nodeTypes) {
       this.nodeTypesRegistry = nodeTypes;
+    } else if (Object.keys(this.nodeTypesRegistry).length === 0) {
+      const { nodeTypes: loadedNodeTypes } = await import('../components/nodes/index');
+      this.nodeTypesRegistry = loadedNodeTypes;
     }
 
     // Initialize execution context
@@ -282,7 +284,7 @@ export class NodeExecutionService {
     this.context?.cleanup();
     this.context = null;
     // Reset node types to default
-    this.nodeTypesRegistry = nodeTypes;
+    this.nodeTypesRegistry = {};
   }
 }
 
