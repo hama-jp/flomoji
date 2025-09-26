@@ -72,7 +72,12 @@ CRITICAL RULES:
 - Always provide position and data.label for nodes
 - Connect nodes using their specific handle names
 - When restructuring, remove obsolete edges with disconnect_nodes before adding new connections to avoid duplicate paths
-- For Japanese users, respond in Japanese but use English for node types`;
+- For Japanese users, respond in Japanese but use English for node types
+
+4. run_workflow - MUST provide:
+   - workflowId: The ID of the workflow to execute.
+   - inputs: An object where keys are the names of the sub-workflow's input nodes and values are the data to pass.
+`;
 
   private getNodeCatalog(): string {
     if (!Array.isArray(copilotNodeCatalog) || copilotNodeCatalog.length === 0) {

@@ -11,19 +11,22 @@ import type { WorkflowNode, NodeInputs, INodeExecutionContext, NodeOutput } from
 async function executeInputNode(
   node: WorkflowNode,
   inputs: NodeInputs,
-  context?: INodeExecutionContext
+  context: INodeExecutionContext
 ): Promise<NodeOutput> {
+  const inputName = node.data.name || 'input';
+  const initialValue = context.getVariable(inputName);
+
+  // Prioritize initial data from the context, falling back to the node's static value.
+  const value = initialValue !== undefined ? initialValue : node.data.value || '';
+
   if (node.data.inputType === 'file') {
-    const value = node.data.fileContent || '';
-    if (context) {
-      context.setVariable(node.id, value);
-    }
-    return value;
+    // Note: File handling logic might need adjustments if used with context variables.
+    const fileContent = node.data.fileContent || value;
+    context.setVariable(node.id, fileContent);
+    return fileContent;
   }
-  const value = node.data.value || '';
-  if (context) {
-    context.setVariable(node.id, value);
-  }
+
+  context.setVariable(node.id, value);
   return value;
 }
 

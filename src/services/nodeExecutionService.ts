@@ -18,7 +18,7 @@ export interface ExecutionGenerator {
   stop(): void;
 }
 
-class NodeExecutionService {
+export class NodeExecutionService {
   private isExecuting: boolean = false;
   private executor: ExecutionGenerator | null = null;
   private context: ExecutionContext | null = null;
@@ -113,7 +113,8 @@ class NodeExecutionService {
     this.context = new ExecutionContext({
       debugMode: false,
       workflowId,
-      inputData
+      inputData,
+      nodes
     });
 
     this.isExecuting = true;

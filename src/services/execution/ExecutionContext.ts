@@ -11,6 +11,7 @@ export interface ExecutionContextOptions {
   debugMode?: boolean;
   workflowId?: string;
   inputData?: Record<string, any>;
+  nodes?: WorkflowNode[];
 }
 
 export class ExecutionContext {

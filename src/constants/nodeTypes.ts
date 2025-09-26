@@ -109,6 +109,15 @@ export const nodeTypes: CopilotNodeInfo[] = [
     icon: '💾'
   },
   {
+    type: 'workflow',
+    name: 'Workflow',
+    description: 'Executes another workflow as a sub-process, passing inputs and receiving outputs.',
+    category: 'Control',
+    inputs: [],
+    outputs: [],
+    icon: '🌊'
+  },
+  {
     type: 'if',
     name: 'If Condition',
     description: 'Splits flow based on a boolean condition, exposing true/false outputs.',

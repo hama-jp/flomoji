@@ -2,7 +2,9 @@ import { Node, Edge, Connection } from '@xyflow/react';
 import useReactFlowStore from '../../store/reactFlowStore';
 import { v4 as uuidv4 } from 'uuid';
 import { WorkflowTemplate } from '../../types/workflow';
-import nodeExecutorService from '../nodeExecutionService';
+import { NodeExecutionService } from '../nodeExecutionService';
+import workflowManagerService from '../workflowManagerService';
+import { NodeInputs } from '../../types';
 import { nodeTypes as copilotNodeCatalog } from '../../constants/nodeTypes';
 import componentNodeDefinitions from '../../components/nodes';
 
@@ -230,6 +232,8 @@ export class ToolInvoker {
         'ifNode': 'if',
         'while': 'while',
         'whileNode': 'while',
+        'workflow': 'workflow',
+        'workflowNode': 'workflow',
         'timestamp': 'timestamp',
         'timestampNode': 'timestamp',
         'variable': 'variable_set',
@@ -586,23 +590,55 @@ export class ToolInvoker {
     }
   }
 
-  private async runWorkflow(params: { mode: 'preview' | 'dry-run' }): Promise<ToolResult> {
+  private async runWorkflow(params: {
+    workflowId: string;
+    inputs: NodeInputs;
+  }): Promise<ToolResult> {
     try {
-      // This would need to integrate with the execution service
-      // For now, return a simulated result
+      const { workflowId, inputs } = params;
+
+      if (!workflowId) {
+        return { success: false, error: 'Workflow ID is not provided' };
+      }
+
+      const workflow = workflowManagerService.getWorkflow(workflowId);
+      if (!workflow || !workflow.flow) {
+        return { success: false, error: `Workflow with ID ${workflowId} not found` };
+      }
+
+      const subWorkflowExecutionService = new NodeExecutionService();
+      const executionGenerator = await subWorkflowExecutionService.startExecution(
+        workflow.flow.nodes,
+        workflow.flow.edges,
+        inputs
+      );
+
+      let lastResult: any;
+      while (true) {
+        const { done, value } = await executionGenerator.next();
+        if (done) {
+          lastResult = value;
+          break;
+        }
+      }
+
+      if (lastResult?.status === 'error') {
+        return {
+          success: false,
+          error: `Sub-workflow execution failed: ${lastResult.error?.message}`,
+        };
+      }
+
+      const outputs = lastResult.variables || {};
+
       return {
         success: true,
         type: 'run_workflow',
-        description: `Run workflow in ${params.mode} mode`,
+        description: `Successfully executed workflow ${workflow.name}`,
         data: {
-          mode: params.mode,
-          results: {
-            nodesExecuted: 0,
-            errors: [],
-            warnings: [],
-          },
+          outputs,
         },
-        confidence: 0.8,
+        confidence: 0.95,
       };
     } catch (error) {
       return {
