@@ -5,7 +5,7 @@ import { ToolInvoker } from './ToolInvoker';
 import { CopilotMemory } from './CopilotMemory';
 import { WorkflowTemplate } from '../../types/workflow';
 import StorageService from '../storageService';
-import { ConversationMessage } from '../../types/conversation';
+import { LLMMessage } from '../../types';
 
 export type CopilotIntent =
   | 'CREATE_FLOW'
@@ -179,7 +179,7 @@ export class CopilotOrchestratorService {
     if (!validation.isValid && validation.errors.length > 0) {
       console.log('Workflow validation failed, attempting self-correction.');
 
-      const correctionMessage: ConversationMessage = {
+      const correctionMessage: LLMMessage = {
         role: 'user',
         content: `The workflow you generated is invalid. Please fix it.
 Validation Errors:
@@ -224,7 +224,7 @@ Analyze the errors and provide a new, complete set of tool calls to create a val
 
       console.log(`Found unconnected output node(s): ${unconnectedOutputIds.join(', ')}. Asking LLM for a final review.`);
 
-      const finalReviewMessage: ConversationMessage = {
+      const finalReviewMessage: LLMMessage = {
         role: 'user',
         content: `The workflow is almost complete, but the output node(s) (${unconnectedOutputIds.join(', ')}) are not connected. Please add the final connection from the last processing node to the output node. Do not create new nodes. Only add the missing connection.`
       };
