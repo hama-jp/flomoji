@@ -106,6 +106,39 @@ pnpm run build
 ```
 The output files will be in the `dist` folder. You can deploy this folder to any static hosting service.
 
+### External Execution (外部からの実行)
+
+You can programmatically run any workflow from an external script or your browser's developer console using the `runFlomojiWorkflow` global function.
+
+**Usage:**
+
+```javascript
+runFlomojiWorkflow(workflowId, inputData)
+  .then(result => {
+    console.log('Workflow completed successfully:', result);
+  })
+  .catch(error => {
+    console.error('Workflow execution failed:', error);
+  });
+```
+
+**Parameters:**
+
+- `workflowId` (string): The ID of the workflow you want to run. You can find the ID in the workflow management screen.
+- `inputData` (object, optional): An object containing the initial input data for the workflow. Defaults to an empty object.
+
+**Example:**
+
+To run a workflow with the ID `my-awesome-workflow` and provide it with some initial data, open your browser's developer console and enter:
+
+```javascript
+runFlomojiWorkflow('my-awesome-workflow', {
+  userInput: 'This is a test message from the console.'
+});
+```
+
+This will execute the workflow and print the final output variables to the console upon completion.
+
 ## 🚀 CI/CD Automation
 
 This repository includes automated CI/CD workflows using GitHub Actions:

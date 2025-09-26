@@ -6,6 +6,10 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App'
 import './utils/debuggerTest' // Load debugger test utility
+import { runFlomojiWorkflow } from './services/globalApi';
+
+// Expose the function to the window object for external access
+(window as any).runFlomojiWorkflow = runFlomojiWorkflow;
 
 // previewModeが未定義の場合のフォールバック
 if (typeof window.previewMode === 'undefined') {
