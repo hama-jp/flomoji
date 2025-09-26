@@ -22,97 +22,108 @@ type NodeHandleInfo = {
   outputs: string[];
 };
 
-const HANDLE_CATALOG: Map<string, NodeHandleInfo> = new Map();
+let HANDLE_CATALOG: Map<string, NodeHandleInfo> | null = null;
 
-copilotNodeCatalog.forEach(entry => {
-  HANDLE_CATALOG.set(entry.type, {
-    inputs: Array.isArray(entry.inputs) ? [...entry.inputs] : [],
-    outputs: Array.isArray(entry.outputs) ? [...entry.outputs] : [],
-  });
-});
-
-Object.entries(componentNodeDefinitions).forEach(([type, definition]) => {
-  if (!HANDLE_CATALOG.has(type)) {
-    HANDLE_CATALOG.set(type, {
-      inputs: Array.isArray(definition.inputs) ? [...definition.inputs] : [],
-      outputs: Array.isArray(definition.outputs) ? [...definition.outputs] : [],
-    });
+function getHandleCatalog(): Map<string, NodeHandleInfo> {
+  if (HANDLE_CATALOG) {
+    return HANDLE_CATALOG;
   }
-});
 
-const ADDITIONAL_HANDLE_DEFINITIONS: Record<string, NodeHandleInfo> = {
-  input: {
-    inputs: [],
-    outputs: ['0'],
-  },
-  output: {
-    inputs: ['0'],
-    outputs: [],
-  },
-  llm: {
-    inputs: ['0'],
-    outputs: ['0'],
-  },
-  timestamp: {
-    inputs: [],
-    outputs: ['0'],
-  },
-  structured_extraction: {
-    inputs: ['0', '1'],
-    outputs: ['0', '1', '2', '3', '4'],
-  },
-  schema_validator: {
-    inputs: ['0', '1', '2'],
-    outputs: ['0', '1', '2', '3', '4'],
-  },
-  http_request: {
-    inputs: ['body', 'query'],
-    outputs: ['response', 'error', 'metadata'],
-  },
-  web_search: {
-    inputs: ['query'],
-    outputs: ['results', 'metadata', 'error'],
-  },
-  code_execution: {
-    inputs: ['input'],
-    outputs: ['output', 'error'],
-  },
-  web_api: {
-    inputs: ['url', 'headers', 'body', 'query', 'path'],
-    outputs: ['output', 'error', 'response'],
-  },
-  variable_set: {
-    inputs: ['input'],
-    outputs: ['output'],
-  },
-  while: {
-    inputs: ['input', 'loop'],
-    outputs: ['output', 'loop'],
-  },
-  if: {
-    inputs: ['input'],
-    outputs: ['true', 'false'],
-  },
-  text_combiner: {
-    inputs: ['input1', 'input2', 'input3', 'input4'],
-    outputs: ['output'],
-  },
-  upper_case: {
-    inputs: ['input'],
-    outputs: ['output', 'metadata', 'error'],
-  },
-};
+  const catalog = new Map<string, NodeHandleInfo>();
 
-Object.entries(ADDITIONAL_HANDLE_DEFINITIONS).forEach(([type, handles]) => {
-  HANDLE_CATALOG.set(type, {
-    inputs: [...handles.inputs],
-    outputs: [...handles.outputs],
+  copilotNodeCatalog.forEach(entry => {
+    catalog.set(entry.type, {
+      inputs: Array.isArray(entry.inputs) ? [...entry.inputs] : [],
+      outputs: Array.isArray(entry.outputs) ? [...entry.outputs] : [],
+    });
   });
-});
 
-// Provide aliases for node types that use different identifiers internally
-if (HANDLE_CATALOG.has('code_execution')) {
-  HANDLE_CATALOG.set('js_code', HANDLE_CATALOG.get('code_execution')!);
+  Object.entries(componentNodeDefinitions).forEach(([type, definition]) => {
+    if (!catalog.has(type)) {
+      catalog.set(type, {
+        inputs: Array.isArray(definition.inputs) ? [...definition.inputs] : [],
+        outputs: Array.isArray(definition.outputs) ? [...definition.outputs] : [],
+      });
+    }
+  });
+
+  const ADDITIONAL_HANDLE_DEFINITIONS: Record<string, NodeHandleInfo> = {
+    input: {
+      inputs: [],
+      outputs: ['0'],
+    },
+    output: {
+      inputs: ['0'],
+      outputs: [],
+    },
+    llm: {
+      inputs: ['0'],
+      outputs: ['0'],
+    },
+    timestamp: {
+      inputs: [],
+      outputs: ['0'],
+    },
+    structured_extraction: {
+      inputs: ['0', '1'],
+      outputs: ['0', '1', '2', '3', '4'],
+    },
+    schema_validator: {
+      inputs: ['0', '1', '2'],
+      outputs: ['0', '1', '2', '3', '4'],
+    },
+    http_request: {
+      inputs: ['body', 'query'],
+      outputs: ['response', 'error', 'metadata'],
+    },
+    web_search: {
+      inputs: ['query'],
+      outputs: ['results', 'metadata', 'error'],
+    },
+    code_execution: {
+      inputs: ['input'],
+      outputs: ['output', 'error'],
+    },
+    web_api: {
+      inputs: ['url', 'headers', 'body', 'query', 'path'],
+      outputs: ['output', 'error', 'response'],
+    },
+    variable_set: {
+      inputs: ['input'],
+      outputs: ['output'],
+    },
+    while: {
+      inputs: ['input', 'loop'],
+      outputs: ['output', 'loop'],
+    },
+    if: {
+      inputs: ['input'],
+      outputs: ['true', 'false'],
+    },
+    text_combiner: {
+      inputs: ['input1', 'input2', 'input3', 'input4'],
+      outputs: ['output'],
+    },
+    upper_case: {
+      inputs: ['input'],
+      outputs: ['output', 'metadata', 'error'],
+    },
+  };
+
+  Object.entries(ADDITIONAL_HANDLE_DEFINITIONS).forEach(([type, handles]) => {
+    catalog.set(type, {
+      inputs: [...handles.inputs],
+      outputs: [...handles.outputs],
+    });
+  });
+
+  // Provide aliases for node types that use different identifiers internally
+  if (catalog.has('code_execution')) {
+    catalog.set('js_code', catalog.get('code_execution')!);
+  }
+
+  HANDLE_CATALOG = catalog;
+  return HANDLE_CATALOG;
 }
 
 export class ToolInvoker {
@@ -368,7 +379,7 @@ export class ToolInvoker {
   }
 
   private lookupHandlesByType(type: string): NodeHandleInfo | null {
-    const info = HANDLE_CATALOG.get(type);
+    const info = getHandleCatalog().get(type);
     if (info) {
       return {
         inputs: [...info.inputs],
