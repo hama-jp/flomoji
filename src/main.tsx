@@ -12,8 +12,7 @@ import { runFlomojiWorkflow } from './services/globalApi';
 (window as any).runFlomojiWorkflow = runFlomojiWorkflow;
 
 // previewModeが未定義の場合のフォールバック
-if (typeof window.previewMode === 'undefined') {
-  console.warn('previewMode was undefined, setting default value to false');
+if (typeof (window as any).previewMode === 'undefined') {
   (window as any).previewMode = false;
 }
 
