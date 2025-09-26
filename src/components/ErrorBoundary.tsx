@@ -2,7 +2,8 @@ import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { RefreshCw, Home, AlertCircle, Bug } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { errorService, ErrorSeverity } from '@/services/errorService';
+import { errorService } from '@/services/errorService';
+import type { ErrorSeverity } from '@/store/errorStore';
 
 interface Props {
   children: ReactNode;
