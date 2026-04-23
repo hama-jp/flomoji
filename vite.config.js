@@ -35,7 +35,10 @@ function getManualChunkName(id) {
   const normalizedId = id.replace(/\\/g, '/')
 
   for (const group of MANUAL_CHUNK_GROUPS) {
-    if (group.packages.some((pkg) => normalizedId.includes(`/node_modules/${pkg}`))) {
+    if (group.packages.some((pkg) => {
+      const needle = pkg.endsWith('/') ? pkg : `${pkg}/`
+      return normalizedId.includes(`/node_modules/${needle}`)
+    })) {
       return group.name
     }
   }
