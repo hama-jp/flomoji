@@ -208,9 +208,10 @@ describe('workflowManagerService', () => {
       return true;
     });
 
-    const template = starterWorkflowTemplates[2];
+    const template = starterWorkflowTemplates.find((entry) => entry.id === 'simple-input-output');
+    expect(template).toBeDefined();
     const createdWorkflow = workflowManagerService.createWorkflowFromTemplate(
-      template.workflow,
+      template!.workflow,
       'Template Copy'
     );
 
@@ -218,11 +219,11 @@ describe('workflowManagerService', () => {
 
     expect(createdWorkflow.id).toBeDefined();
     expect(createdWorkflow.name).toBe('Template Copy');
-    expect(createdWorkflow.flow).not.toBe(template.workflow.flow);
-    expect(createdWorkflow.flow.nodes).toEqual(template.workflow.flow.nodes);
+    expect(createdWorkflow.flow).not.toBe(template!.workflow.flow);
+    expect(createdWorkflow.flow.nodes).toEqual(template!.workflow.flow.nodes);
 
     const createdInputNode = createdWorkflow.flow.nodes[0] as { data: { label: string } };
-    const templateInputNode = template.workflow.flow.nodes[0] as { data: { label: string } };
+    const templateInputNode = template!.workflow.flow.nodes[0] as { data: { label: string } };
 
     createdInputNode.data.label = 'Changed';
 

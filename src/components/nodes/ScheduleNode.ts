@@ -1,6 +1,7 @@
 import { createNodeDefinition } from './types';
 import type { WorkflowNode, NodeInputs, INodeExecutionContext, NodeOutput } from '../../types';
 import schedulerService from '../../services/schedulerService';
+import StorageService from '../../services/storageService';
 
 /**
  * スケジュールノードの実行処理
@@ -12,17 +13,20 @@ import schedulerService from '../../services/schedulerService';
  * @returns {Promise<string>} スケジュール情報
  */
 async function executeScheduleNode(node: WorkflowNode, inputs: NodeInputs, context?: INodeExecutionContext): Promise<NodeOutput> {
-  const { cronExpression, scheduleName, enabled }: any = node.data;
+  const { cronExpression, scheduleName, enabled, timezone, timeoutMinutes }: any = node.data;
   
   context?.addLog('info', 'スケジュールトリガーノード情報を確認中', node.id, { 
     cronExpression, 
     scheduleName, 
-    enabled 
+    enabled,
+    timezone,
+    timeoutMinutes
   });
 
   // このノードは情報表示用（実際のトリガーは別途管理）
   const currentTime = new Date().toISOString();
-  const nextExecution = enabled ? schedulerService.getNextExecution(node.id) : null;
+  const workflowId = StorageService.getCurrentWorkflowId() || node.id;
+  const nextExecution = enabled ? schedulerService.getNextExecution(workflowId) : null;
   
   const scheduleInfo = {
     triggerType: 'Schedule Trigger Node',
@@ -30,6 +34,8 @@ async function executeScheduleNode(node: WorkflowNode, inputs: NodeInputs, conte
     cronExpression,
     scheduleName,
     enabled,
+    timezone: timezone || 'Asia/Tokyo',
+    timeoutMinutes: timeoutMinutes || 30,
     nextExecution: nextExecution?.toISOString() || null,
     note: 'This node triggers the entire workflow at scheduled times'
   };

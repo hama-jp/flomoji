@@ -10,6 +10,34 @@ declare global {
   }
 }
 
+export function serializePromptInput(value: unknown): string {
+  if (typeof value === 'string') {
+    return value;
+  }
+
+  if (value === null || value === undefined) {
+    return '';
+  }
+
+  if (typeof value === 'object') {
+    return JSON.stringify(value, null, 2);
+  }
+
+  return String(value);
+}
+
+export function buildFinalPrompt(inputValues: unknown[], promptPrefix?: string): string {
+  const promptParts = inputValues
+    .map(serializePromptInput)
+    .filter((value) => value.trim().length > 0);
+
+  if (promptPrefix && promptPrefix.trim()) {
+    promptParts.unshift(promptPrefix.trim());
+  }
+
+  return promptParts.join('\n\n');
+}
+
 /**
  * LLM生成ノードの実行処理
  * @param {Object} node - ノードオブジェクト
@@ -31,7 +59,7 @@ async function executeLLMNode(node: WorkflowNode, inputs: NodeInputs, context?: 
     throw new Error('LLMノードに入力がありません');
   }
   
-  const finalPrompt = inputValues.join('\n');
+  const finalPrompt = buildFinalPrompt(inputValues, nodeData.prompt);
   
   try {
     // デバッグ情報をログに記録
@@ -107,6 +135,7 @@ export const LLMNode = createNodeDefinition(
   {
     temperature: 1.0,
     model: 'gpt-5-nano',
+    prompt: '',
     systemPrompt: '',
     maxTokens: 50000
   },

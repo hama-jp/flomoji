@@ -1,11 +1,14 @@
 import React, { useCallback, memo } from 'react';
 
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Textarea } from '@/components/ui/textarea';
 
+import StorageService from '../../../services/storageService';
 import schedulerService, { SchedulerService } from '../../../services/schedulerService';
+import useReactFlowStore from '../../../store/reactFlowStore';
+
 import CustomNode from './CustomNode';
 
 interface ScheduleNodeComponentProps {
@@ -14,29 +17,49 @@ interface ScheduleNodeComponentProps {
 }
 
 const ScheduleNodeComponent: React.FC<ScheduleNodeComponentProps> = ({ id, data }) => {
-  // イベントハンドラー
+  const updateNodeData = useReactFlowStore((state: any) => state.updateNodeData);
+  const cronPresets = SchedulerService.getCronPresets();
+
   const onScheduleNameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    // Handle schedule name change
-  }, []);
+    updateNodeData(id, { scheduleName: e.target.value });
+  }, [id, updateNodeData]);
 
   const onCronExpressionChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    // Handle cron expression change
-  }, []);
+    updateNodeData(id, { cronExpression: e.target.value });
+  }, [id, updateNodeData]);
 
   const onTimeoutChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    // Handle timeout change
-  }, []);
+    const parsed = parseInt(e.target.value, 10);
+    updateNodeData(id, { timeoutMinutes: Number.isNaN(parsed) ? 30 : parsed });
+  }, [id, updateNodeData]);
 
   const onEnabledChange = useCallback((checked: boolean) => {
-    // Handle enabled change
-  }, []);
+    updateNodeData(id, { enabled: checked });
+  }, [id, updateNodeData]);
+
+  const applyPreset = useCallback((cronExpression: string) => {
+    updateNodeData(id, { cronExpression });
+  }, [id, updateNodeData]);
 
   const getNextExecution = () => {
-    // Calculate next execution time
-    return null;
+    const workflowId = StorageService.getCurrentWorkflowId();
+    if (!workflowId || !data.enabled) {
+      return null;
+    }
+
+    const nextExecution = schedulerService.getNextExecution(workflowId);
+    if (!nextExecution) {
+      return null;
+    }
+
+    return nextExecution.toLocaleString('ja-JP', {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
 
-  // Cron式の説明を生成
   const getCronDescription = () => {
     if (!data.cronExpression) return '';
     return SchedulerService.humanReadableCron(data.cronExpression);
@@ -45,7 +68,6 @@ const ScheduleNodeComponent: React.FC<ScheduleNodeComponentProps> = ({ id, data 
   return (
     <CustomNode data={data} id={id}>
       <div className="space-y-3 min-w-[280px]">
-        {/* スケジュール名 */}
         <div className="space-y-1">
           <Label htmlFor={`schedule-name-${id}`} className="text-xs font-medium">
             スケジュール名
@@ -55,18 +77,17 @@ const ScheduleNodeComponent: React.FC<ScheduleNodeComponentProps> = ({ id, data 
             value={data.scheduleName || ''}
             onChange={onScheduleNameChange}
             className="nodrag text-xs"
-            placeholder="例: Daily Report"
+            placeholder="例: Morning Research Digest"
           />
         </div>
 
-        {/* Cron式 */}
-        <div className="space-y-1">
+        <div className="space-y-2">
           <div className="flex items-center justify-between">
             <Label htmlFor={`cron-${id}`} className="text-xs font-medium">
               Cron式
             </Label>
             <div className="text-xs text-muted-foreground font-mono">
-              分 時 日 月 曜日<br/>
+              分 時 日 月 曜日<br />
               *  *  *  *  *
             </div>
           </div>
@@ -75,7 +96,7 @@ const ScheduleNodeComponent: React.FC<ScheduleNodeComponentProps> = ({ id, data 
             value={data.cronExpression || ''}
             onChange={onCronExpressionChange}
             className="nodrag text-xs font-mono"
-            placeholder="0 9 * * *"
+            placeholder="0 9 * * 1-5"
           />
           {data.cronExpression && (
             <div className="text-xs text-muted-foreground">
@@ -84,7 +105,21 @@ const ScheduleNodeComponent: React.FC<ScheduleNodeComponentProps> = ({ id, data 
           )}
         </div>
 
-        {/* タイムアウト設定 */}
+        <div className="flex flex-wrap gap-1">
+          {cronPresets.slice(0, 5).map((preset) => (
+            <Button
+              key={preset.value}
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-7 px-2 text-[11px]"
+              onClick={() => applyPreset(preset.value)}
+            >
+              {preset.label}
+            </Button>
+          ))}
+        </div>
+
         <div className="space-y-1">
           <Label htmlFor={`timeout-${id}`} className="text-xs font-medium">
             タイムアウト (分)
@@ -100,7 +135,6 @@ const ScheduleNodeComponent: React.FC<ScheduleNodeComponentProps> = ({ id, data 
           />
         </div>
 
-        {/* 有効/無効スイッチ */}
         <div className="flex items-center justify-between space-x-2">
           <Label htmlFor={`enabled-${id}`} className="text-xs font-medium">
             スケジュール有効
@@ -112,7 +146,6 @@ const ScheduleNodeComponent: React.FC<ScheduleNodeComponentProps> = ({ id, data 
           />
         </div>
 
-        {/* ステータス表示 */}
         <div className="pt-2 border-t border-gray-200">
           <div className="space-y-1 text-xs">
             <div className="flex justify-between">
@@ -121,20 +154,23 @@ const ScheduleNodeComponent: React.FC<ScheduleNodeComponentProps> = ({ id, data 
                 {data.enabled ? '有効' : '無効'}
               </span>
             </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">タイムゾーン:</span>
+              <span>{data.timezone || 'Asia/Tokyo'}</span>
+            </div>
             {data.enabled && (
-              <div className="flex justify-between">
+              <div className="flex justify-between gap-2">
                 <span className="text-muted-foreground">次回実行:</span>
-                <span className="text-blue-600 text-xs">
-                  {getNextExecution() || '計算中...'}
+                <span className="text-blue-600 text-xs text-right">
+                  {getNextExecution() || '保存後に更新'}
                 </span>
               </div>
             )}
           </div>
         </div>
 
-        {/* ヘルプテキスト */}
         <div className="text-xs text-muted-foreground bg-gray-50 p-2 rounded">
-          💡 このノードはワークフロー全体をスケジュール実行します。エッジ接続は不要です。
+          💡 このノードはワークフロー全体をスケジュール実行します。ニュース監視なら平日朝のcronを入れておくと運用しやすいです。
         </div>
       </div>
     </CustomNode>

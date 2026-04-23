@@ -9,6 +9,11 @@ import CustomNode from './CustomNode';
 const LLMNodeComponent = ({ id, data }: any) => {
   const updateNodeData = useReactFlowStore((state: any) => state.updateNodeData);
 
+  const onPromptChange = (evt: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newValue = evt.target.value;
+    updateNodeData(id, { prompt: newValue });
+  };
+
   const onSystemPromptChange = (evt: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newValue = evt.target.value;
     updateNodeData(id, { systemPrompt: newValue });
@@ -25,6 +30,17 @@ const LLMNodeComponent = ({ id, data }: any) => {
   return (
     <CustomNode data={nodeDataWithHandles} id={id}>
       <div className="space-y-3">
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Prompt Prefix</label>
+          <Textarea
+            value={data.prompt || ''}
+            onChange={onPromptChange}
+            className="nodrag text-xs resize-both"
+            style={{ resize: 'both', overflow: 'auto', minWidth: '200px', minHeight: '72px' }}
+            placeholder="Summarize the input into a dated research digest with links and key takeaways..."
+            rows={3}
+          />
+        </div>
         <div>
           <label className="text-xs text-gray-500 block mb-1">System Prompt</label>
           <Textarea
