@@ -106,7 +106,7 @@ export class NodeExecutionService {
     if (nodeTypes) {
       this.nodeTypesRegistry = nodeTypes;
     } else if (Object.keys(this.nodeTypesRegistry).length === 0) {
-      const { nodeTypes: loadedNodeTypes } = await import('../components/nodes/index');
+      const { nodeTypes: loadedNodeTypes } = await import('../components/nodes/executionRegistry');
       this.nodeTypesRegistry = loadedNodeTypes;
     }
 
