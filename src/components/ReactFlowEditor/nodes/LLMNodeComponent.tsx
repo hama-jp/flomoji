@@ -37,7 +37,7 @@ const LLMNodeComponent = ({ id, data }: any) => {
           />
         </div>
         <div className="text-xs text-gray-400">
-          Model: {data.model || 'gpt-3.5-turbo'}
+          Model: {data.model || 'gpt-5-nano'}
         </div>
       </div>
     </CustomNode>

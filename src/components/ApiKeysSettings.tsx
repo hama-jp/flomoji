@@ -32,6 +32,17 @@ interface ApiKeys {
   [key: string]: ApiKey;
 }
 
+const getCurrentLLMProviderLabel = (provider?: string) => {
+  const providerLabels: Record<string, string> = {
+    openai: 'OpenAI',
+    anthropic: 'Anthropic',
+    local: 'Local LLM',
+    custom: 'Custom API',
+  };
+
+  return providerLabels[provider || 'openai'] || 'LLM';
+};
+
 const ApiKeysSettings: React.FC = () => {
   const [apiKeys, setApiKeys] = useState<ApiKeys>({});
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
@@ -49,7 +60,12 @@ const ApiKeysSettings: React.FC = () => {
     
     // 既存のLLM APIキー
     if (settings.apiKey) {
-      keys['openai'] = { name: 'OpenAI API Key', key: settings.apiKey, provider: 'openai' };
+      const providerLabel = getCurrentLLMProviderLabel(settings.provider);
+      keys['llm-current'] = {
+        name: `${providerLabel} API Key`,
+        key: settings.apiKey,
+        provider: 'llm'
+      };
     }
     
     // Web検索APIキー
@@ -81,7 +97,7 @@ const ApiKeysSettings: React.FC = () => {
     
     // プロバイダー別に保存
     switch (keyData.provider) {
-      case 'openai':
+      case 'llm':
         settings.apiKey = keyData.key;
         break;
       case 'google':
@@ -119,7 +135,7 @@ const ApiKeysSettings: React.FC = () => {
     const keyData = apiKeys[id];
     
     switch (keyData.provider) {
-      case 'openai':
+      case 'llm':
         delete settings.apiKey;
         break;
       case 'google':
@@ -165,7 +181,7 @@ const ApiKeysSettings: React.FC = () => {
 
   const getProviderIcon = (provider: string) => {
     const icons: Record<string, JSX.Element> = {
-      openai: <Brain className="w-4 h-4" />,
+      llm: <Brain className="w-4 h-4" />,
       google: <Search className="w-4 h-4" />,
       brave: <Globe className="w-4 h-4" />,
       bing: <Search className="w-4 h-4" />,
@@ -176,7 +192,7 @@ const ApiKeysSettings: React.FC = () => {
 
   const getProviderColor = (provider: string) => {
     const colors: Record<string, string> = {
-      openai: 'bg-green-500',
+      llm: 'bg-green-500',
       google: 'bg-blue-500',
       brave: 'bg-orange-500',
       bing: 'bg-purple-500',
@@ -186,7 +202,7 @@ const ApiKeysSettings: React.FC = () => {
   };
 
   const predefinedKeys = [
-    { id: 'openai', name: 'OpenAI API Key', provider: 'openai', description: 'GPT-3.5/GPT-4 アクセス用' },
+    { id: 'llm-current', name: 'Current LLM API Key', provider: 'llm', description: '設定画面で選択中のLLMプロバイダー用' },
     { id: 'google', name: 'Google Search API Key', provider: 'google', description: 'Google Custom Search API用' },
     { id: 'google-cse', name: 'Google Search Engine ID', provider: 'google', description: 'カスタム検索エンジンID' },
     { id: 'brave', name: 'Brave Search API Key', provider: 'brave', description: 'Brave Search API用' },
@@ -347,7 +363,7 @@ const ApiKeysSettings: React.FC = () => {
                   >
                     <option value="">プロバイダーを選択</option>
                     <option value="custom">カスタム</option>
-                    <option value="openai">OpenAI</option>
+                    <option value="llm">Current LLM</option>
                     <option value="google">Google</option>
                     <option value="brave">Brave</option>
                     <option value="bing">Bing</option>
@@ -364,7 +380,7 @@ const ApiKeysSettings: React.FC = () => {
         <Alert variant={"default" as const} className="">
           <Shield className="h-4 w-4" />
           <AlertDescription className="">
-            APIキーは暗号化されてローカルに保存されます。外部サーバーには送信されません。
+            APIキーはこのブラウザのローカルストレージに保存されます。外部サーバーへ自動送信はされませんが、共有端末では取り扱いに注意してください。
           </AlertDescription>
         </Alert>
       </CardContent>

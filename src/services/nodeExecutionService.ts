@@ -111,7 +111,7 @@ export class NodeExecutionService {
     }
 
     // Initialize execution context
-    const workflowId = StorageService.get<string>('currentWorkflowId') || 'default';
+    const workflowId = StorageService.getCurrentWorkflowId() || 'default';
     this.context = new ExecutionContext({
       debugMode: false,
       workflowId,

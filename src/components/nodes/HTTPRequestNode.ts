@@ -1,3 +1,4 @@
+import StorageService from '../../services/storageService';
 import { createNodeDefinition } from './types';
 import type { WorkflowNode, NodeInputs, INodeExecutionContext, NodeOutput } from '../../types';
 import type { HTTPRequestNodeData } from '../../types/nodeData';
@@ -8,12 +9,14 @@ export async function executeHTTPRequestNode(node: WorkflowNode, inputs: NodeInp
   const { method = 'GET', url, headers = {}, timeout = 30000, useTemplate, template } = data;
   
   // テンプレート使用時の処理
+  let finalMethod = method;
   let finalUrl = url;
   let finalHeaders = headers;
   let body = inputs.body || data.body;
   
   if (useTemplate && template) {
     const templateConfig = getTemplateConfig(template || '', (inputs.query as string) || '');
+    finalMethod = templateConfig.method || finalMethod;
     finalUrl = templateConfig.url;
     finalHeaders = { ...templateConfig.headers, ...(typeof headers === 'object' && headers !== null ? headers : {}) };
     body = templateConfig.body || body;
@@ -44,12 +47,12 @@ export async function executeHTTPRequestNode(node: WorkflowNode, inputs: NodeInp
   
   // リクエストオプション
   const requestOptions: any = {
-    method,
+    method: finalMethod,
     headers: processedHeaders,
   };
   
   // ボディの処理（GET以外）
-  if (method !== 'GET' && body) {
+  if (finalMethod !== 'GET' && body) {
     if (typeof body === 'object') {
       requestOptions.body = JSON.stringify(body);
       const headers = processedHeaders as Record<string, string>;
@@ -116,66 +119,110 @@ export async function executeHTTPRequestNode(node: WorkflowNode, inputs: NodeInp
 }
 
 // テンプレート設定を取得
-function getTemplateConfig(templateName: string, query: string): any {
-  const templates = {
-    'google-search': {
-      url: `https://www.googleapis.com/customsearch/v1?q=${encodeURIComponent(query)}&key=YOUR_API_KEY&cx=YOUR_SEARCH_ENGINE_ID`,
-      headers: {
-        'Accept': 'application/json'
-      },
-      description: 'Google Custom Search API'
-    },
-    'brave-search': {
-      url: `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=10`,
-      headers: {
-        'Accept': 'application/json',
-        'X-Subscription-Token': 'YOUR_API_KEY'
-      },
-      description: 'Brave Search API'
-    },
-    'bing-search': {
-      url: `https://api.bing.microsoft.com/v7.0/search?q=${encodeURIComponent(query)}&count=10`,
-      headers: {
-        'Ocp-Apim-Subscription-Key': 'YOUR_API_KEY',
-        'Accept': 'application/json'
-      },
-      description: 'Bing Search API'
-    },
-    'openai-completion': {
-      url: 'https://api.openai.com/v1/chat/completions',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer YOUR_API_KEY'
-      },
-      body: {
-        model: 'gpt-3.5-turbo',
-        messages: [{ role: 'user', content: query }],
-        temperature: 0.7
-      },
-      description: 'OpenAI Chat Completion'
-    },
-    'anthropic-completion': {
-      url: 'https://api.anthropic.com/v1/messages',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': 'YOUR_API_KEY',
-        'anthropic-version': '2023-06-01'
-      },
-      body: {
-        model: 'claude-3-sonnet-20240229',
-        max_tokens: 1024,
-        messages: [{ role: 'user', content: query }]
-      },
-      description: 'Anthropic Claude API'
-    }
-  };
-  
-  const template = templates[templateName as keyof typeof templates];
-  if (!template) {
-    throw new Error(`未知のテンプレート: ${templateName}`);
+type HTTPTemplateConfig = {
+  method?: string;
+  url: string;
+  headers: Record<string, string>;
+  body?: any;
+  description: string;
+};
+
+function requireSetting(value: string | undefined, label: string): string {
+  if (!value || !value.trim()) {
+    throw new Error(`${label} が設定されていません。設定画面で値を保存してください。`);
   }
-  
-  return template;
+
+  return value;
+}
+
+function getTemplateConfig(templateName: string, query: string): HTTPTemplateConfig {
+  const settings = StorageService.getSettings({});
+
+  switch (templateName) {
+    case 'google-search': {
+      const apiKey = requireSetting(settings.googleApiKey, 'Google Search API Key');
+      const searchEngineId = requireSetting(settings.googleSearchEngineId, 'Google Search Engine ID');
+
+      return {
+        method: 'GET',
+        url: `https://www.googleapis.com/customsearch/v1?q=${encodeURIComponent(query)}&key=${encodeURIComponent(apiKey)}&cx=${encodeURIComponent(searchEngineId)}`,
+        headers: {
+          'Accept': 'application/json'
+        },
+        description: 'Google Custom Search API'
+      };
+    }
+
+    case 'brave-search': {
+      const apiKey = requireSetting(settings.braveApiKey, 'Brave Search API Key');
+
+      return {
+        method: 'GET',
+        url: `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=10`,
+        headers: {
+          'Accept': 'application/json',
+          'X-Subscription-Token': apiKey
+        },
+        description: 'Brave Search API'
+      };
+    }
+
+    case 'bing-search': {
+      const apiKey = requireSetting(settings.bingApiKey, 'Bing Search API Key');
+
+      return {
+        method: 'GET',
+        url: `https://api.bing.microsoft.com/v7.0/search?q=${encodeURIComponent(query)}&count=10`,
+        headers: {
+          'Ocp-Apim-Subscription-Key': apiKey,
+          'Accept': 'application/json'
+        },
+        description: 'Bing Search API'
+      };
+    }
+
+    case 'openai-completion': {
+      const apiKey = requireSetting(settings.apiKey, 'Current LLM API Key');
+
+      return {
+        method: 'POST',
+        url: 'https://api.openai.com/v1/chat/completions',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: {
+          model: 'gpt-5-nano',
+          messages: [{ role: 'user', content: query }],
+          temperature: 0.7
+        },
+        description: 'OpenAI Chat Completion'
+      };
+    }
+
+    case 'anthropic-completion': {
+      const apiKey = requireSetting(settings.apiKey, 'Current LLM API Key');
+
+      return {
+        method: 'POST',
+        url: 'https://api.anthropic.com/v1/messages',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01'
+        },
+        body: {
+          model: 'claude-3-5-sonnet-20241022',
+          max_tokens: 1024,
+          messages: [{ role: 'user', content: query }]
+        },
+        description: 'Anthropic Claude API'
+      };
+    }
+
+    default:
+      throw new Error(`未知のテンプレート: ${templateName}`);
+  }
 }
 
 // ノード定義

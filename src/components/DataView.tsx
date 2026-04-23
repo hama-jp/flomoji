@@ -11,7 +11,7 @@ import StorageService from '../services/storageService'
 import { Workflow as WorkflowType, ChatHistoryItem, Session, ParsedWorkflowRun, ParsedNodeLog } from '../types'
 
 const DataView = () => {
-  const [_chatHistory, setChatHistory] = useState<Session[]>([])
+  const [chatSessions, setChatSessions] = useState<Session[]>([])
   const [workflowData, setWorkflowData] = useState<WorkflowType[]>([])
   const [sortBy, setSortBy] = useState('timestamp') // 'timestamp' or 'name'
   const [sortOrder, setSortOrder] = useState('desc') // 'asc' or 'desc'
@@ -25,7 +25,7 @@ const DataView = () => {
     try {
       const history = StorageService.getChatHistory([])
       const sessions = groupChatMessages(history)
-      setChatHistory(sessions)
+      setChatSessions(sessions)
     } catch (error) {
       errorService.logError(error as Error, {
         context: 'load_chat_history'
@@ -33,7 +33,7 @@ const DataView = () => {
         category: 'system',
         userMessage: 'チャット履歴の読み込みに失敗しました'
       })
-      setChatHistory([])
+      setChatSessions([])
     }
 
     // ワークフローデータを読み込み
@@ -359,10 +359,62 @@ const DataView = () => {
         </TabsList>
 
         <TabsContent value="chat" className="space-y-4 mt-6">
-          <Card className="p-6">
-            <CardContent className="text-center text-gray-500">
-              <MessageSquare className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-              <p>Chat history feature coming soon</p>
+          <div className="flex justify-between items-center">
+            <div className="flex items-center space-x-4">
+              <h3 className="text-lg font-semibold">Chat Sessions ({chatSessions.length} items)</h3>
+            </div>
+            <Button variant="outline" onClick={() => handleExportData('chat')} disabled={chatSessions.length === 0}>
+              <Download className="h-4 w-4 mr-2" />Export Chat History
+            </Button>
+          </div>
+          <Card className="overflow-hidden">
+            <CardContent className="p-0">
+              {chatSessions.length === 0 ? (
+                <div className="text-center py-12">
+                  <MessageSquare className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                  <p className="text-gray-500">No chat history available</p>
+                  <p className="text-sm text-gray-400 mt-1">Start a chat to see saved conversations here</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-200">
+                  {chatSessions.map((session) => (
+                    <div key={session.id} className="p-5 space-y-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <p className="font-medium text-gray-900">{session.title}</p>
+                          <div className="flex flex-wrap items-center gap-3 text-sm text-gray-500 mt-1">
+                            <span>{session.messageCount} messages</span>
+                            <span>Created: {formatDate(session.createdAt)}</span>
+                            <span>Last activity: {formatDate(session.lastActivity)}</span>
+                          </div>
+                        </div>
+                        <Badge variant="secondary">{session.messages.length} entries</Badge>
+                      </div>
+
+                      <div className="space-y-2">
+                        {session.messages.map((message) => (
+                          <div
+                            key={message.id}
+                            className={`rounded-lg border p-3 ${
+                              message.role === 'user'
+                                ? 'bg-blue-50 border-blue-100'
+                                : 'bg-gray-50 border-gray-200'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-3 mb-1">
+                              <Badge variant={message.role === 'user' ? 'default' : 'outline'}>
+                                {message.role}
+                              </Badge>
+                              <span className="text-xs text-gray-500">{formatDate(message.timestamp)}</span>
+                            </div>
+                            <p className="text-sm whitespace-pre-wrap text-gray-800">{message.message}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

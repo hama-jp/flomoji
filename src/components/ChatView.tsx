@@ -19,13 +19,24 @@ interface ChatHistoryItem {
   isError?: boolean;
 }
 
+const createTimestamp = () => new Date().toISOString()
+
+const formatTimestamp = (timestamp: string) => {
+  const parsed = new Date(timestamp)
+  if (Number.isNaN(parsed.getTime())) {
+    return timestamp
+  }
+
+  return parsed.toLocaleString('ja-JP')
+}
+
 const ChatView: React.FC = () => {
   const [messages, setMessages] = useState<ChatHistoryItem[]>([
     {
       id: '1',
       role: 'assistant',
       message: 'Hello! Welcome to 🌊 flomoji. How can I help you today?',
-      timestamp: new Date().toLocaleTimeString()
+      timestamp: createTimestamp()
     }
   ])
   const [inputValue, setInputValue] = useState('')
@@ -48,7 +59,7 @@ const ChatView: React.FC = () => {
       id: Date.now().toString(),
       role: 'user',
       message: inputValue,
-      timestamp: new Date().toLocaleTimeString()
+      timestamp: createTimestamp()
     }
 
     setMessages(prev => [...prev, userMessage])
@@ -63,7 +74,7 @@ const ChatView: React.FC = () => {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
         message: response,
-        timestamp: new Date().toLocaleTimeString()
+        timestamp: createTimestamp()
       }
       
       setMessages(prev => [...prev, botMessage])
@@ -81,7 +92,7 @@ const ChatView: React.FC = () => {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
         message: `An error occurred: ${error.message}`,
-        timestamp: new Date().toLocaleTimeString(),
+        timestamp: createTimestamp(),
         isError: true
       }
       
@@ -105,7 +116,7 @@ const ChatView: React.FC = () => {
           id: '1',
           role: 'assistant',
           message: 'Chat history cleared. Let\'s start a new conversation!',
-          timestamp: new Date().toLocaleTimeString()
+          timestamp: createTimestamp()
         }
       ])
       StorageService.remove(StorageService.KEYS.CHAT_HISTORY)
@@ -170,7 +181,7 @@ const ChatView: React.FC = () => {
                           ? 'text-red-400' 
                           : 'text-gray-400'
                     }`}>
-                      {message.timestamp}
+                      {formatTimestamp(message.timestamp)}
                     </p>
                   </div>
                 </div>
