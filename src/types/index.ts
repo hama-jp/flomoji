@@ -226,16 +226,23 @@ export interface ParsedNodeLog {
 /**
  * Schedule configuration for workflows
  */
+export interface ScheduleError {
+  message: string;
+  timestamp: string;
+}
+
 export interface ScheduleConfig {
   workflowId: string;
   cronExpression: string;
   name: string;
   enabled: boolean;
+  nodeId?: string;
   timezone?: string;
   timeoutMinutes?: number;
   createdAt?: string;
   lastExecuted?: string | null;
   executionCount?: number;
+  lastError?: ScheduleError | null;
   onExecute?: () => void;
 }
 
@@ -247,6 +254,13 @@ export interface ExecutionInfo {
   workflowId: string;
   scheduleConfig: ScheduleConfig;
   timeoutHandle?: NodeJS.Timeout;
+}
+
+export interface ActiveScheduleExecution {
+  workflowId: string;
+  startedAt: Date;
+  scheduleConfig: ScheduleConfig;
+  runningTime: number;
 }
 
 /**

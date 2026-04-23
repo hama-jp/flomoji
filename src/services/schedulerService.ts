@@ -7,7 +7,7 @@
 
 import { Cron } from 'croner';
 
-import type { CronPreset, ExecutionInfo, ScheduleConfig } from '../types';
+import type { ActiveScheduleExecution, CronPreset, ExecutionInfo, ScheduleConfig } from '../types';
 
 import StorageService from './storageService';
 
@@ -35,7 +35,7 @@ export class SchedulerService {
    */
   private loadSchedulesFromStorage(): void {
     try {
-      const schedules = StorageService.get<Record<string, ScheduleConfig>>('scheduler-workflows', {});
+      const schedules = StorageService.getSchedulerWorkflows({});
       if (schedules) {
         this.scheduledWorkflows = new Map(Object.entries(schedules));
         
@@ -59,7 +59,7 @@ export class SchedulerService {
   private saveSchedulesToStorage(): void {
     try {
       const schedules = Object.fromEntries(this.scheduledWorkflows);
-      StorageService.set('scheduler-workflows', schedules);
+      StorageService.setSchedulerWorkflows(schedules);
     } catch (error: any) {
       // テスト環境やlocalStorageが利用できない場合の対応
       console.warn('SchedulerService: ストレージへの保存に失敗:', (error as Error).message);
@@ -269,6 +269,9 @@ export class SchedulerService {
    */
   removeSchedule(workflowId: string): boolean {
     try {
+      if (this.activeExecutions.has(workflowId)) {
+        this.forceStopExecution(workflowId);
+      }
       this.stopSchedule(workflowId);
       this.scheduledWorkflows.delete(workflowId);
       this.saveSchedulesToStorage();
@@ -438,16 +441,12 @@ export class SchedulerService {
   /**
    * 実行中のワークフロー一覧を取得
    */
-  getActiveExecutions(): Array<{
-    workflowId: string;
-    startedAt: Date;
-    scheduleConfig: ScheduleConfig;
-    runningTime: number;
-  }> {
-    return Array.from(this.activeExecutions.entries()).map(([workflowId, info]: any) => ({
-      ...info,
+  getActiveExecutions(): ActiveScheduleExecution[] {
+    return Array.from(this.activeExecutions.entries()).map(([workflowId, info]: any): ActiveScheduleExecution => ({
       workflowId,
-      isActive: this.activeJobs.has(workflowId)
+      startedAt: info.startedAt,
+      scheduleConfig: info.scheduleConfig,
+      runningTime: Math.max(0, Date.now() - info.startedAt.getTime())
     }));
   }
 
@@ -467,6 +466,23 @@ export class SchedulerService {
 
     this.cleanupExecution(workflowId);
     return true;
+  }
+
+  /**
+   * 全てのスケジュール設定を削除
+   */
+  clearSchedules(): void {
+    const activeWorkflowIds = Array.from(this.activeExecutions.keys());
+    activeWorkflowIds.forEach((workflowId: any) => {
+      if (this.workflowStopCallback) {
+        this.workflowStopCallback(workflowId, 'manual');
+      }
+      this.cleanupExecution(workflowId);
+    });
+
+    this.stopAllSchedules();
+    this.scheduledWorkflows.clear();
+    this.saveSchedulesToStorage();
   }
 
   /**

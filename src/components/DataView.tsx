@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { Download, Upload, Trash2, FileText, MessageSquare, Workflow, History, Settings, ArrowUpDown, ArrowUp, ArrowDown, Clock, CheckCircle, XCircle, Loader, ChevronDown, ChevronRight } from 'lucide-react'
+import { Download, Upload, Trash2, FileText, MessageSquare, Workflow, History, Settings, ArrowUp, ArrowDown, Clock, CheckCircle, XCircle, Loader, ChevronDown, ChevronRight, RefreshCw, StopCircle, Activity } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -8,11 +8,25 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import workflowManagerService from '../services/workflowManagerService'
 import logService from '../services/logService'
 import StorageService from '../services/storageService'
-import { Workflow as WorkflowType, ChatHistoryItem, Session, ParsedWorkflowRun, ParsedNodeLog } from '../types'
+import schedulerService, { SchedulerService } from '../services/schedulerService'
+import { ActiveScheduleExecution, Workflow as WorkflowType, ChatHistoryItem, Session, ParsedWorkflowRun, ParsedNodeLog, ScheduleConfig } from '../types'
+
+type DataTab = 'chat' | 'operations' | 'workflows' | 'settings'
+
+type ScheduledWorkflowItem = {
+  workflow: WorkflowType | null
+  schedule: ScheduleConfig & { isActive: boolean }
+  nextExecution: Date | null
+  activeExecution: ActiveScheduleExecution | null
+  latestRun: ParsedWorkflowRun | null
+}
 
 const DataView = () => {
+  const [activeTab, setActiveTab] = useState<DataTab>('operations')
   const [chatSessions, setChatSessions] = useState<Session[]>([])
   const [workflowData, setWorkflowData] = useState<WorkflowType[]>([])
+  const [scheduledWorkflows, setScheduledWorkflows] = useState<ScheduledWorkflowItem[]>([])
+  const [operationsLoading, setOperationsLoading] = useState(false)
   const [sortBy, setSortBy] = useState('timestamp') // 'timestamp' or 'name'
   const [sortOrder, setSortOrder] = useState('desc') // 'asc' or 'desc'
   const [expandedWorkflows, setExpandedWorkflows] = useState(new Set<string>()) // 展開されているワークフローID
@@ -20,34 +34,9 @@ const DataView = () => {
   const [expandedRuns, setExpandedRuns] = useState(new Set<string>()) // 展開されている実行ID
   const [runDetails, setRunDetails] = useState<Record<string, ParsedNodeLog[]>>({}) // runId -> ノードログ配列
 
-  const loadData = useCallback(() => {
-    // チャット履歴を読み込み
-    try {
-      const history = StorageService.getChatHistory([])
-      const sessions = groupChatMessages(history)
-      setChatSessions(sessions)
-    } catch (error) {
-      errorService.logError(error as Error, {
-        context: 'load_chat_history'
-      }, {
-        category: 'system',
-        userMessage: 'チャット履歴の読み込みに失敗しました'
-      })
-      setChatSessions([])
-    }
-
-    // ワークフローデータを読み込み
-    const workflows = Object.values(workflowManagerService.getWorkflows());
-    setWorkflowData(workflows);
-  }, [])
-
-  useEffect(() => {
-    loadData()
-  }, [loadData])
-
-  const groupChatMessages = (messages: ChatHistoryItem[]): Session[] => {
-    const sessions: Session[] = [];
-    let currentSession: Session | null = null;
+  const groupChatMessages = useCallback((messages: ChatHistoryItem[]): Session[] => {
+    const sessions: Session[] = []
+    let currentSession: Session | null = null
 
     messages.forEach((message, index) => {
       if (message.role === 'user') {
@@ -66,10 +55,93 @@ const DataView = () => {
         currentSession.messages.push(message)
       }
     })
-    
+
     if (currentSession) sessions.push(currentSession)
     return sessions.reverse()
-  }
+  }, [])
+
+  const loadOperationsData = useCallback(async (workflowsSnapshot?: WorkflowType[]) => {
+    setOperationsLoading(true)
+
+    try {
+      const workflows = workflowsSnapshot || Object.values(workflowManagerService.getWorkflows())
+      const workflowMap = new Map(workflows.map((workflow) => [workflow.id, workflow]))
+      const activeExecutions = new Map(
+        schedulerService.getActiveExecutions().map((execution) => [execution.workflowId, execution])
+      )
+
+      const items = await Promise.all(
+        schedulerService.getAllSchedules().map(async (schedule) => {
+          const runs = await logService.getRunsForWorkflow(schedule.workflowId)
+
+          return {
+            workflow: workflowMap.get(schedule.workflowId) || null,
+            schedule,
+            nextExecution: schedule.enabled ? schedulerService.getNextExecution(schedule.workflowId) : null,
+            activeExecution: activeExecutions.get(schedule.workflowId) ?? null,
+            latestRun: runs[0] ?? null
+          }
+        })
+      )
+
+      items.sort((a, b) => {
+        if (Boolean(a.activeExecution) !== Boolean(b.activeExecution)) {
+          return a.activeExecution ? -1 : 1
+        }
+
+        if (a.schedule.enabled !== b.schedule.enabled) {
+          return a.schedule.enabled ? -1 : 1
+        }
+
+        return (a.workflow?.name || a.schedule.name).localeCompare(
+          b.workflow?.name || b.schedule.name,
+          'ja-JP'
+        )
+      })
+
+      setScheduledWorkflows(items)
+    } catch (error) {
+      console.error('Failed to load operations data:', error)
+      setScheduledWorkflows([])
+    } finally {
+      setOperationsLoading(false)
+    }
+  }, [])
+
+  const loadCoreData = useCallback((): WorkflowType[] => {
+    // チャット履歴を読み込み
+    try {
+      const history = StorageService.getChatHistory([])
+      const sessions = groupChatMessages(history)
+      setChatSessions(sessions)
+    } catch (error) {
+      errorService.logError(error as Error, {
+        context: 'load_chat_history'
+      }, {
+        category: 'system',
+        userMessage: 'チャット履歴の読み込みに失敗しました'
+      })
+      setChatSessions([])
+    }
+
+    // ワークフローデータを読み込み
+    const workflows = Object.values(workflowManagerService.getWorkflows())
+    setWorkflowData(workflows)
+    return workflows
+  }, [groupChatMessages])
+
+  useEffect(() => {
+    const workflows = loadCoreData()
+    void loadOperationsData(workflows)
+  }, [loadCoreData, loadOperationsData])
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      void loadOperationsData()
+    }, 30000)
+
+    return () => window.clearInterval(intervalId)
+  }, [loadOperationsData])
 
   const handleExportData = (type: 'chat' | 'workflows' | 'all') => {
     let data: object = {}
@@ -81,7 +153,10 @@ const DataView = () => {
         filename = 'chat_history.json'
         break
       case 'workflows':
-        data = { workflows: workflowManagerService.getWorkflows() }
+        data = {
+          workflows: workflowManagerService.getWorkflows(),
+          schedules: StorageService.getSchedulerWorkflows({})
+        }
         filename = 'workflow_data.json'
         break
       case 'all':
@@ -89,6 +164,7 @@ const DataView = () => {
           chatHistory: StorageService.getChatHistory([]),
           workflows: workflowManagerService.getWorkflows(),
           settings: StorageService.getSettings({}),
+          schedules: StorageService.getSchedulerWorkflows({}),
         }
         filename = 'llm_agent_backup.json'
         break
@@ -122,14 +198,23 @@ const DataView = () => {
           StorageService.setChatHistory(data.chatHistory)
         }
         if (data.workflows) {
-          const workflows = data.workflows as Record<string, WorkflowType>;
-          Object.values(workflows).forEach((wf: WorkflowType) => workflowManagerService.saveWorkflow(wf));
+          const workflows = data.workflows as Record<string, WorkflowType>
+          Object.values(workflows).forEach((wf: WorkflowType) => workflowManagerService.saveWorkflow(wf))
         }
         if (data.settings) {
           StorageService.setSettings(data.settings)
         }
-        
-        loadData()
+
+        if (data.schedules) {
+          schedulerService.clearSchedules()
+          const schedules = data.schedules as Record<string, ScheduleConfig>
+          Object.entries(schedules).forEach(([workflowId, schedule]) => {
+            schedulerService.setSchedule(workflowId, schedule)
+          })
+        }
+
+        const workflows = loadCoreData()
+        void loadOperationsData(workflows)
         alert('Data import completed successfully')
       } catch (error: any) {
         alert('Failed to read file: ' + error.message)
@@ -141,8 +226,19 @@ const DataView = () => {
 
   const handleDeleteWorkflow = (id: string) => {
     if (confirm('Delete this workflow?')) {
-      workflowManagerService.deleteWorkflow(id);
-      loadData();
+      workflowManagerService.deleteWorkflow(id)
+      setExpandedWorkflows(prev => {
+        const updated = new Set(prev)
+        updated.delete(id)
+        return updated
+      })
+      setExecutionHistories(prev => {
+        const updated = { ...prev }
+        delete updated[id]
+        return updated
+      })
+      const workflows = loadCoreData()
+      void loadOperationsData(workflows)
     }
   }
 
@@ -150,6 +246,10 @@ const DataView = () => {
     if (confirm('Delete all execution history? This action cannot be undone.')) {
       try {
         await logService.clearAllLogs()
+        setExecutionHistories({})
+        setExpandedRuns(new Set())
+        setRunDetails({})
+        await loadOperationsData()
         alert('Execution history has been deleted')
       } catch (error: any) {
         errorService.logError(error as Error, {
@@ -165,6 +265,7 @@ const DataView = () => {
 
   const handleClearAllData = () => {
     if (confirm('Delete all data? This action cannot be undone.')) {
+      schedulerService.clearSchedules()
       StorageService.clear() // 全てのStorageServiceキーをクリア
       // 実行履歴も削除
       logService.clearAllLogs().catch(err => {
@@ -175,7 +276,12 @@ const DataView = () => {
           userMessage: 'ログのクリアに失敗しました'
         })
       })
-      loadData()
+      setExecutionHistories({})
+      setExpandedWorkflows(new Set())
+      setExpandedRuns(new Set())
+      setRunDetails({})
+      const workflows = loadCoreData()
+      void loadOperationsData(workflows)
       alert('All data has been deleted')
     }
   }
@@ -185,7 +291,7 @@ const DataView = () => {
     const usageInfo = StorageService.getUsageInfo()
     const totalSize = Object.values(usageInfo).reduce((total, info) => total + info.size, 0)
     return (totalSize / 1024).toFixed(1) + ' KB'
-  }, [workflowData]) // workflowDataが変更されたときに再計算
+  }, [workflowData, scheduledWorkflows]) // 保存データが変更されたときに再計算
 
   const formatDate = (dateString: string | Date | null | undefined) => {
     if (!dateString) return 'Unknown'
@@ -195,6 +301,37 @@ const DataView = () => {
       console.error("Error formatting date:", e);
       return String(dateString);
     }
+  }
+
+  const formatRelativeTime = (dateString: string | Date | null | undefined) => {
+    if (!dateString) return 'Not scheduled'
+
+    const date = new Date(dateString)
+    if (Number.isNaN(date.getTime())) {
+      return 'Unknown'
+    }
+
+    const diffMs = date.getTime() - Date.now()
+    const diffMinutes = Math.round(diffMs / (1000 * 60))
+    const formatter = new Intl.RelativeTimeFormat('ja-JP', { numeric: 'auto' })
+
+    if (Math.abs(diffMinutes) < 60) {
+      return formatter.format(diffMinutes, 'minute')
+    }
+
+    const diffHours = Math.round(diffMs / (1000 * 60 * 60))
+    if (Math.abs(diffHours) < 24) {
+      return formatter.format(diffHours, 'hour')
+    }
+
+    const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24))
+    return formatter.format(diffDays, 'day')
+  }
+
+  const formatRunningTime = (runningTimeMs: number) => {
+    const durationSeconds = Math.max(0, Math.round(runningTimeMs / 1000))
+    if (durationSeconds < 60) return `${durationSeconds}s`
+    return `${Math.floor(durationSeconds / 60)}m ${durationSeconds % 60}s`
   }
 
   // ワークフローデータをソート（メモ化で最適化）
@@ -216,6 +353,13 @@ const DataView = () => {
     return sorted
   }, [workflowData, sortBy, sortOrder])
 
+  const operationsSummary = useMemo(() => ({
+    total: scheduledWorkflows.length,
+    enabled: scheduledWorkflows.filter((item) => item.schedule.enabled).length,
+    running: scheduledWorkflows.filter((item) => item.activeExecution).length,
+    attention: scheduledWorkflows.filter((item) => item.schedule.lastError || item.latestRun?.status === 'failed').length
+  }), [scheduledWorkflows])
+
   // ソート切り替え関数
   const handleSort = (newSortBy: 'timestamp' | 'name') => {
     if (sortBy === newSortBy) {
@@ -226,6 +370,37 @@ const DataView = () => {
       setSortBy(newSortBy)
       setSortOrder(newSortBy === 'timestamp' ? 'desc' : 'asc')
     }
+  }
+
+  const handleToggleSchedule = (workflowId: string, enabled: boolean) => {
+    if (!schedulerService.toggleSchedule(workflowId, enabled)) {
+      alert('Failed to update schedule state')
+      return
+    }
+
+    void loadOperationsData()
+  }
+
+  const handleStopScheduledExecution = (workflowId: string) => {
+    if (!confirm('Stop the current scheduled run?')) return
+
+    if (!schedulerService.forceStopExecution(workflowId)) {
+      alert('No running execution was found')
+      return
+    }
+
+    void loadOperationsData()
+  }
+
+  const handleRemoveSchedule = (workflowId: string) => {
+    if (!confirm('Remove this schedule?')) return
+
+    if (!schedulerService.removeSchedule(workflowId)) {
+      alert('Failed to remove schedule')
+      return
+    }
+
+    void loadOperationsData()
   }
 
   // ワークフローの実行履歴を取得
@@ -242,6 +417,19 @@ const DataView = () => {
         ...prev,
         [workflowId]: []
       }))
+    }
+  }
+
+  const focusWorkflowHistory = async (workflowId: string) => {
+    setActiveTab('workflows')
+    setExpandedWorkflows(prev => {
+      const updated = new Set(prev)
+      updated.add(workflowId)
+      return updated
+    })
+
+    if (!executionHistories[workflowId]) {
+      await loadExecutionHistory(workflowId)
     }
   }
 
@@ -338,7 +526,7 @@ const DataView = () => {
       <div className="flex justify-between items-center mb-6">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Data Management</h2>
-          <p className="text-gray-600 mt-1">Manage and export chat history and workflow data</p>
+          <p className="text-gray-600 mt-1">Manage workflow data, schedules, and execution history</p>
         </div>
         <div className="flex space-x-2">
           <input type="file" accept=".json" onChange={handleImportData} className="hidden" id="import-file" />
@@ -351,9 +539,10 @@ const DataView = () => {
         </div>
       </div>
 
-      <Tabs defaultValue="workflows" className="space-y-6">
-        <TabsList className="grid grid-cols-3 w-full max-w-md">
+      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as DataTab)} className="space-y-6">
+        <TabsList className="grid grid-cols-4 w-full max-w-xl">
           <TabsTrigger value="chat">Chat History</TabsTrigger>
+          <TabsTrigger value="operations">Operations</TabsTrigger>
           <TabsTrigger value="workflows">Workflows</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
@@ -413,6 +602,229 @@ const DataView = () => {
                       </div>
                     </div>
                   ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="operations" className="space-y-6 mt-6">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h3 className="text-lg font-semibold">Research Operations ({scheduledWorkflows.length} schedules)</h3>
+              <p className="text-sm text-gray-500 mt-1">
+                Monitor recurring research runs, next execution windows, and the latest outcomes.
+              </p>
+            </div>
+            <Button variant="outline" onClick={() => void loadOperationsData()} disabled={operationsLoading}>
+              <RefreshCw className={`h-4 w-4 mr-2 ${operationsLoading ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <Card>
+              <CardContent className="p-5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-500">Scheduled Workflows</p>
+                    <p className="text-2xl font-semibold text-gray-900 mt-1">{operationsSummary.total}</p>
+                  </div>
+                  <Workflow className="h-5 w-5 text-gray-400" />
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-500">Enabled Schedules</p>
+                    <p className="text-2xl font-semibold text-gray-900 mt-1">{operationsSummary.enabled}</p>
+                  </div>
+                  <Clock className="h-5 w-5 text-gray-400" />
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-500">Running Now</p>
+                    <p className="text-2xl font-semibold text-gray-900 mt-1">{operationsSummary.running}</p>
+                  </div>
+                  <Activity className="h-5 w-5 text-gray-400" />
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-500">Needs Attention</p>
+                    <p className="text-2xl font-semibold text-gray-900 mt-1">{operationsSummary.attention}</p>
+                  </div>
+                  <XCircle className="h-5 w-5 text-gray-400" />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card className="overflow-hidden">
+            <CardContent className="p-0">
+              {scheduledWorkflows.length === 0 ? (
+                <div className="text-center py-12">
+                  <Clock className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                  <p className="text-gray-500">No scheduled workflows configured</p>
+                  <p className="text-sm text-gray-400 mt-1">
+                    Add a Schedule node to a research workflow to monitor it here.
+                  </p>
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-200">
+                  {scheduledWorkflows.map((item) => {
+                    const workflowLabel = item.workflow?.name || item.schedule.name
+                    const latestRunStatus = item.latestRun?.status
+                    const runBadgeVariant = latestRunStatus === 'completed'
+                      ? 'default'
+                      : latestRunStatus === 'failed'
+                        ? 'destructive'
+                        : 'secondary'
+
+                    return (
+                      <div key={item.schedule.workflowId} className="p-5 space-y-4">
+                        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                          <div className="space-y-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Workflow className="h-5 w-5 text-gray-500" />
+                              <p className="font-medium text-gray-900">{workflowLabel}</p>
+                              {item.activeExecution ? (
+                                <Badge variant="secondary" className="bg-blue-100 text-blue-800 hover:bg-blue-100">
+                                  Running
+                                </Badge>
+                              ) : item.schedule.enabled ? (
+                                <Badge variant="secondary" className="bg-green-100 text-green-800 hover:bg-green-100">
+                                  Active
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline">Paused</Badge>
+                              )}
+                              {!item.workflow && (
+                                <Badge variant="destructive">Missing Workflow</Badge>
+                              )}
+                            </div>
+                            <p className="text-sm text-gray-500">
+                              {item.workflow
+                                ? `${item.workflow.flow.nodes?.length || 0} nodes, ${item.workflow.flow.edges?.length || 0} edges`
+                                : 'This workflow no longer exists. Remove the orphaned schedule or re-import the workflow.'}
+                            </p>
+                          </div>
+
+                          <div className="flex flex-wrap gap-2">
+                            {item.workflow && (
+                              <Button
+                                variant={item.schedule.enabled ? 'outline' : 'default'}
+                                size="sm"
+                                onClick={() => handleToggleSchedule(item.schedule.workflowId, !item.schedule.enabled)}
+                              >
+                                {item.schedule.enabled ? 'Pause Schedule' : 'Resume Schedule'}
+                              </Button>
+                            )}
+                            {item.activeExecution && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleStopScheduledExecution(item.schedule.workflowId)}
+                                className="text-red-600 hover:text-red-700"
+                              >
+                                <StopCircle className="h-4 w-4 mr-2" />
+                                Stop Run
+                              </Button>
+                            )}
+                            {item.workflow ? (
+                              <Button variant="ghost" size="sm" onClick={() => void focusWorkflowHistory(item.schedule.workflowId)}>
+                                View History
+                              </Button>
+                            ) : (
+                              <Button variant="outline" size="sm" onClick={() => handleRemoveSchedule(item.schedule.workflowId)}>
+                                Remove Schedule
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                          <div className="rounded-lg border p-3">
+                            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Cadence</p>
+                            <p className="mt-1 font-medium text-gray-900">
+                              {SchedulerService.humanReadableCron(item.schedule.cronExpression)}
+                            </p>
+                            <p className="mt-1 text-xs text-gray-500">{item.schedule.cronExpression}</p>
+                          </div>
+                          <div className="rounded-lg border p-3">
+                            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Next Run</p>
+                            <p className="mt-1 font-medium text-gray-900">
+                              {item.schedule.enabled && item.nextExecution ? formatRelativeTime(item.nextExecution) : 'Paused'}
+                            </p>
+                            <p className="mt-1 text-xs text-gray-500">
+                              {item.nextExecution ? formatDate(item.nextExecution) : 'Waiting for resume'}
+                            </p>
+                          </div>
+                          <div className="rounded-lg border p-3">
+                            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Last Executed</p>
+                            <p className="mt-1 font-medium text-gray-900">
+                              {item.schedule.lastExecuted ? formatDate(item.schedule.lastExecuted) : 'Never'}
+                            </p>
+                            <p className="mt-1 text-xs text-gray-500">
+                              {item.schedule.executionCount || 0} total run{(item.schedule.executionCount || 0) === 1 ? '' : 's'}
+                            </p>
+                          </div>
+                          <div className="rounded-lg border p-3">
+                            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                              {item.activeExecution ? 'Running For' : 'Timeout Window'}
+                            </p>
+                            <p className="mt-1 font-medium text-gray-900">
+                              {item.activeExecution
+                                ? formatRunningTime(item.activeExecution.runningTime)
+                                : `${item.schedule.timeoutMinutes || 30} minutes`}
+                            </p>
+                            <p className="mt-1 text-xs text-gray-500">
+                              {item.activeExecution ? 'Updated every 30 seconds' : 'Maximum run duration'}
+                            </p>
+                          </div>
+                        </div>
+
+                        {item.latestRun && (
+                          <div className="rounded-lg border bg-gray-50 p-3 text-sm">
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                              <div className="flex items-center gap-2">
+                                {getStatusIcon(item.latestRun.status)}
+                                <span className="font-medium text-gray-900">Latest Run</span>
+                                <Badge variant={runBadgeVariant} className="text-xs">
+                                  {item.latestRun.status}
+                                </Badge>
+                              </div>
+                              <span className="text-xs text-gray-500">{formatDate(item.latestRun.startedAt)}</span>
+                            </div>
+                            <p className="mt-2 text-xs text-gray-600">
+                              {item.latestRun.endedAt
+                                ? `Duration: ${calculateDuration(item.latestRun.startedAt, item.latestRun.endedAt)}`
+                                : 'This run is still in progress.'}
+                            </p>
+                          </div>
+                        )}
+
+                        {item.schedule.lastError && (
+                          <div className="rounded-lg border border-red-200 bg-red-50 p-3">
+                            <p className="text-sm font-medium text-red-800">Last Scheduler Error</p>
+                            <p className="mt-1 text-sm text-red-700">{item.schedule.lastError.message}</p>
+                            <p className="mt-1 text-xs text-red-600">
+                              {formatDate(item.schedule.lastError.timestamp)}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
                 </div>
               )}
             </CardContent>

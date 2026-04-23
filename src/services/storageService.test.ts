@@ -165,6 +165,23 @@ describe('StorageService', () => {
       expect(retrieved[0].id).toBe('msg-50'); // 最初の50件が削除され、50から開始
       expect(retrieved[99].id).toBe('msg-149'); // 最後の要素
     });
+
+    it('should handle scheduler workflow operations', () => {
+      const schedules = {
+        'wf-1': {
+          workflowId: 'wf-1',
+          cronExpression: '0 9 * * *',
+          name: 'Morning Digest',
+          enabled: true
+        }
+      };
+
+      const success = StorageService.setSchedulerWorkflows(schedules);
+      expect(success).toBe(true);
+
+      const retrieved = StorageService.getSchedulerWorkflows();
+      expect(retrieved).toEqual(schedules);
+    });
   });
 
   describe('Storage management', () => {
@@ -205,6 +222,7 @@ describe('StorageService', () => {
       expect(StorageService.KEYS.CURRENT_WORKFLOW_ID).toBe('llm-agent-current-workflow-id');
       expect(StorageService.KEYS.CHAT_HISTORY).toBe('llm-agent-chat-history');
       expect(StorageService.KEYS.WORKFLOW_HISTORY).toBe('llm-agent-workflow-history');
+      expect(StorageService.KEYS.SCHEDULER_WORKFLOWS).toBe('scheduler-workflows');
     });
   });
 });

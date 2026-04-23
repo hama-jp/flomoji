@@ -4,6 +4,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 import workflowManagerService from './workflowManagerService';
 import StorageService from './storageService';
+import schedulerService from './schedulerService';
 import { Workflow } from '../types';
 import { starterWorkflowTemplates } from '../data/starterWorkflowTemplates';
 
@@ -123,6 +124,7 @@ describe('workflowManagerService', () => {
   it('should delete a workflow', () => {
     const savedWorkflows: Record<string, Workflow> = {};
     let currentId: string | null = null;
+    const removeScheduleSpy = vi.spyOn(schedulerService, 'removeSchedule').mockReturnValue(true);
     
     vi.spyOn(StorageService, 'getWorkflows').mockImplementation(() => {
       // Return a copy to allow delete operations
@@ -154,6 +156,7 @@ describe('workflowManagerService', () => {
     expect(Object.keys(allWorkflows).length).toBe(1);
     // 削除されたワークフローがundefinedであることを確認
     expect(allWorkflows[wf1.id]).toBeUndefined();
+    expect(removeScheduleSpy).toHaveBeenCalledWith(wf1.id);
   });
 
   it('should manage current workflow ID', () => {

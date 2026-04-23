@@ -6,6 +6,7 @@
 import type { Workflow } from '../types';
 
 import StorageService from './storageService';
+import schedulerService from './schedulerService';
 import { createModuleLogger } from '../utils/logger';
 
 const logger = createModuleLogger('WorkflowManager');
@@ -176,6 +177,7 @@ class WorkflowManagerService {
     const workflows = this.getWorkflows();
     delete workflows[id];
     StorageService.setWorkflows(workflows);
+    schedulerService.removeSchedule(id);
 
     // If deleting the current workflow, switch to another or create new
     if (this.getCurrentWorkflowId() === id) {
