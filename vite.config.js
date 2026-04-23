@@ -28,11 +28,20 @@ const MANUAL_CHUNK_GROUPS = [
 ]
 
 function getManualChunkName(id) {
-  if (!id.includes('node_modules')) {
-    return undefined
+  const normalizedId = id.replace(/\\/g, '/')
+
+  // Keep Rollup's shared commonjs helper in vendor-react so the React chunk
+  // has no outbound cross-chunk imports. Otherwise Rollup places the helper
+  // in an arbitrary chunk (e.g. vendor-data), which creates a cycle
+  // vendor-react → vendor-data → vendor-misc → vendor-react and causes
+  // "Cannot set properties of undefined (setting 'Children')" at load time.
+  if (normalizedId.includes('commonjsHelpers.js')) {
+    return 'vendor-react'
   }
 
-  const normalizedId = id.replace(/\\/g, '/')
+  if (!normalizedId.includes('node_modules')) {
+    return undefined
+  }
 
   for (const group of MANUAL_CHUNK_GROUPS) {
     if (group.packages.some((pkg) => {
