@@ -5,6 +5,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import workflowManagerService from './workflowManagerService';
 import StorageService from './storageService';
 import { Workflow } from '../types';
+import { starterWorkflowTemplates } from '../data/starterWorkflowTemplates';
 
 // Mock localStorage
 const localStorageMock = (() => {
@@ -166,5 +167,35 @@ describe('workflowManagerService', () => {
     
     workflowManagerService.setCurrentWorkflowId('test-id');
     expect(workflowManagerService.getCurrentWorkflowId()).toBe('test-id');
+  });
+
+  it('should apply a starter template onto an existing workflow', () => {
+    const savedWorkflows: Record<string, Workflow> = {};
+    let currentId: string | null = null;
+
+    vi.spyOn(StorageService, 'getWorkflows').mockImplementation(() => savedWorkflows);
+    vi.spyOn(StorageService, 'setWorkflows').mockImplementation((workflows) => {
+      Object.assign(savedWorkflows, workflows);
+      return true;
+    });
+    vi.spyOn(StorageService, 'setCurrentWorkflowId').mockImplementation((id) => {
+      currentId = id;
+      return true;
+    });
+    vi.spyOn(StorageService, 'getCurrentWorkflowId').mockImplementation(() => currentId);
+
+    const blankWorkflow = workflowManagerService.createNewWorkflow('Untitled Workflow');
+    workflowManagerService.saveWorkflow(blankWorkflow);
+
+    const updatedWorkflow = workflowManagerService.applyTemplateToWorkflow(
+      blankWorkflow.id,
+      starterWorkflowTemplates[0].workflow
+    );
+
+    expect(updatedWorkflow).not.toBeNull();
+    expect(updatedWorkflow?.id).toBe(blankWorkflow.id);
+    expect(updatedWorkflow?.name).toBe('Prompt Assistant');
+    expect(updatedWorkflow?.flow.nodes.length).toBeGreaterThan(0);
+    expect(workflowManagerService.getCurrentWorkflowId()).toBe(blankWorkflow.id);
   });
 });

@@ -17,6 +17,10 @@ function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 }
 
+function cloneWorkflowData<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
 /**
  * Load a sample workflow from the public directory
  */
@@ -215,6 +219,49 @@ class WorkflowManagerService {
       },
       lastModified: new Date().toISOString(),
     };
+  }
+
+  /**
+   * Create a brand-new workflow from a starter template
+   */
+  createWorkflowFromTemplate(
+    template: Pick<Workflow, 'name' | 'description' | 'flow'>,
+    name: string = template.name
+  ): Workflow {
+    return {
+      id: generateId(),
+      name,
+      description: template.description,
+      flow: cloneWorkflowData(template.flow),
+      lastModified: new Date().toISOString(),
+    };
+  }
+
+  /**
+   * Apply a starter template onto an existing workflow
+   */
+  applyTemplateToWorkflow(
+    workflowId: string,
+    template: Pick<Workflow, 'name' | 'description' | 'flow'>,
+    name: string = template.name
+  ): Workflow | null {
+    const existingWorkflow = this.getWorkflow(workflowId);
+    if (!existingWorkflow) {
+      logger.warn(`Cannot apply template to missing workflow: ${workflowId}`);
+      return null;
+    }
+
+    const updatedWorkflow: Workflow = {
+      ...existingWorkflow,
+      name,
+      description: template.description,
+      flow: cloneWorkflowData(template.flow),
+      lastModified: new Date().toISOString(),
+    };
+
+    this.saveWorkflow(updatedWorkflow);
+    this.setCurrentWorkflowId(updatedWorkflow.id);
+    return updatedWorkflow;
   }
   /**
    * Reset the service state for testing.
