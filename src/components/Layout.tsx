@@ -24,6 +24,7 @@ interface NodeData {
   variable?: string;
   operator?: string;
   format?: string;
+  title?: string;
   result?: string;
   variableName?: string;
   useInput?: boolean;
@@ -186,7 +187,51 @@ const NodePropertiesPanel = ({ editingNode, onEditingNodeChange }: NodePropertie
             )}
             </div></>) : (<><div><label className="block text-xs font-medium mb-1 text-gray-600">Variable Name</label><input type="text" value={editingNode.data.variable || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleDataChange({ variable: e.target.value })} className="w-full px-2 py-1.5 text-sm border rounded-md" placeholder="Variable name to compare" /></div><div><label className="block text-xs font-medium mb-1 text-gray-600">Operator</label><select value={editingNode.data.operator || '=='} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleDataChange({ operator: e.target.value })} className="w-full px-2 py-1.5 text-sm border rounded-md"><option value="==">== (Equal)</option><option value="!=">!= (Not Equal)</option><option value="<">&lt; (Less Than)</option><option value="<=">&lt;= (Less Than or Equal)</option><option value=">">&gt; (Greater Than)</option><option value=">=">&gt;= (Greater Than or Equal)</option></select></div><div><label className="block text-xs font-medium mb-1 text-gray-600">Comparison Value</label><input type="text" value={editingNode.data.value || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleDataChange({ value: e.target.value })} className="w-full px-2 py-1.5 text-sm border rounded-md" placeholder="Value to compare" /></div></>)}</> )}
         {editingNode.type === 'while' && ( <><div><label className="block text-xs font-medium mb-1 text-gray-600">Condition Type</label><select value={editingNode.data.conditionType || 'variable'} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleDataChange({ conditionType: e.target.value })} className="w-full px-2 py-1.5 text-sm border rounded-md"><option value="variable">Variable Comparison</option><option value="llm">LLM Judgment</option></select></div>{editingNode.data.conditionType === 'variable' ? (<><div><label className="block text-xs font-medium mb-1 text-gray-600">Variable Name</label><input type="text" value={editingNode.data.variable || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleDataChange({ variable: e.target.value })} className="w-full px-2 py-1.5 text-sm border rounded-md" placeholder="Variable name to compare" /></div><div><label className="block text-xs font-medium mb-1 text-gray-600">Operator</label><select value={editingNode.data.operator || '<'} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleDataChange({ operator: e.target.value })} className="w-full px-2 py-1.5 text-sm border rounded-md"><option value="==">== (Equal)</option><option value="!=">!= (Not Equal)</option><option value="<">&lt; (Less Than)</option><option value="<=">&lt;= (Less Than or Equal)</option><option value=">">&gt; (Greater Than)</option><option value=">=">&gt;= (Greater Than or Equal)</option></select></div><div><label className="block text-xs font-medium mb-1 text-gray-600">Comparison Value</label><input type="text" value={editingNode.data.value || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleDataChange({ value: e.target.value })} className="w-full px-2 py-1.5 text-sm border rounded-md" placeholder="Value to compare" /></div></>) : (<div><label className="block text-xs font-medium mb-1 text-gray-600">Continue Condition</label><textarea value={editingNode.data.condition || ''} onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => handleDataChange({ condition: e.target.value })} className="w-full px-2 py-1.5 text-sm border rounded-md" rows={3} placeholder="Enter condition to continue iteration" /></div>)}<div><label className="block text-xs font-medium mb-1 text-gray-600">Max Iterations</label><input type="number" value={editingNode.data.maxIterations || 100} onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleDataChange({ maxIterations: parseInt(e.target.value) })} className="w-full px-2 py-1.5 text-sm border rounded-md" min="1" max="1000" /></div></> )}
-        {editingNode.type === 'output' && ( <><div><label className="block text-xs font-medium mb-1 text-gray-600">Output Format</label><select value={editingNode.data.format || 'text'} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleDataChange({ format: e.target.value })} className="w-full px-2 py-1.5 text-sm border rounded-md"><option value="text">Text</option><option value="json">JSON</option><option value="markdown">Markdown</option></select></div><div><label className="block text-xs font-medium mb-1 text-gray-600">Execution Result</label><textarea value={String(editingNode.data.result || '')} readOnly className="w-full px-3 py-2 border rounded-md bg-gray-100 resize-none" style={{ height: `${calculateTextAreaHeight(5)}px` }} /></div></> )}
+        {editingNode.type === 'output' && (
+          <>
+            <div>
+              <label className="block text-xs font-medium mb-1 text-gray-600">Output Title</label>
+              <input
+                type="text"
+                value={editingNode.data.title || ''}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleDataChange({ title: e.target.value })}
+                className="w-full px-2 py-1.5 text-sm border rounded-md"
+                placeholder="Result"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1 text-gray-600">Download File Name</label>
+              <input
+                type="text"
+                value={editingNode.data.fileName || ''}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleDataChange({ fileName: e.target.value })}
+                className="w-full px-2 py-1.5 text-sm border rounded-md"
+                placeholder="workflow-output"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1 text-gray-600">Output Format</label>
+              <select
+                value={editingNode.data.format || 'text'}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleDataChange({ format: e.target.value })}
+                className="w-full px-2 py-1.5 text-sm border rounded-md"
+              >
+                <option value="text">Text</option>
+                <option value="json">JSON</option>
+                <option value="markdown">Markdown</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1 text-gray-600">Execution Result</label>
+              <textarea
+                value={String(editingNode.data.result || '')}
+                readOnly
+                className="w-full px-3 py-2 border rounded-md bg-gray-100 resize-none"
+                style={{ height: `${calculateTextAreaHeight(5)}px` }}
+              />
+            </div>
+          </>
+        )}
         {editingNode.type === 'variable_set' && (
           <>
             <div><label className="block text-xs font-medium mb-1 text-gray-600">Variable Name</label><input type="text" value={editingNode.data.variableName || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleDataChange({ variableName: e.target.value })} className="w-full px-2 py-1.5 text-sm border rounded-md" placeholder="Variable name to set" /></div>

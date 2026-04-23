@@ -96,8 +96,9 @@ export interface NodeData extends Record<string, any> {
   fileContent?: string;
   name?: string;
   // For OutputNode
-  format?: 'text' | 'json';
+  format?: 'text' | 'json' | 'markdown';
   title?: string;
+  fileName?: string;
   // For WorkflowNode
   workflowId?: string;
   workflowName?: string;
