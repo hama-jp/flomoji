@@ -18,7 +18,9 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 
+import { starterWorkflowTemplates } from '@/data/starterWorkflowTemplates';
 import { Workflow } from '@/types';
+import StarterWorkflowPanel from './StarterWorkflowPanel';
 import { useDebuggerStore } from '../store/debuggerStore';
 import { cn } from '../lib/utils';
 
@@ -39,6 +41,7 @@ interface WorkflowToolbarProps {
   onStepForward: () => void;
   isExecuting: boolean;
   onOpenCopilot?: () => void;
+  onCreateFromTemplate?: (templateId: string) => void;
 }
 
 const WorkflowToolbar = ({
@@ -57,12 +60,14 @@ const WorkflowToolbar = ({
   onStop,
   onStepForward,
   isExecuting = false,
-  onOpenCopilot
+  onOpenCopilot,
+  onCreateFromTemplate
 }: WorkflowToolbarProps) => {
   const [isRenaming, setIsRenaming] = useState(false);
   const [newName, setNewName] = useState('');
   const [showLoadDialog, setShowLoadDialog] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showTemplatesDialog, setShowTemplatesDialog] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
 
@@ -118,6 +123,11 @@ const WorkflowToolbar = ({
     onLoad?.(workflowId);
     setShowLoadDialog(false);
     toast.success('Workflow loaded');
+  };
+
+  const handleCreateFromTemplate = (templateId: string) => {
+    onCreateFromTemplate?.(templateId);
+    setShowTemplatesDialog(false);
   };
 
   const handleSave = () => {
@@ -295,6 +305,35 @@ const WorkflowToolbar = ({
                   Create Workflow
                 </Button>
               </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={showTemplatesDialog} onOpenChange={setShowTemplatesDialog}>
+            <DialogTrigger asChild>
+              <Button size="sm" variant="outline">
+                <Sparkles className="h-4 w-4 mr-1.5" />
+                Templates
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-5xl">
+              <DialogHeader className="sr-only">
+                <DialogTitle>Browse Starter Templates</DialogTitle>
+                <DialogDescription>
+                  Create a new workflow from a starter template without overwriting your current canvas.
+                </DialogDescription>
+              </DialogHeader>
+              <StarterWorkflowPanel
+                templates={starterWorkflowTemplates}
+                onApplyTemplate={handleCreateFromTemplate}
+                onDismiss={() => setShowTemplatesDialog(false)}
+                variant="inline"
+                badgeLabel="Starter Templates"
+                title="Create a workflow from a starter template"
+                description="Use a ready-made workflow whenever you want a head start. Your current canvas stays untouched."
+                applyLabel="Create Workflow"
+                dismissLabel="Close Browser"
+                dismissDescription="Prefer to start empty? Close this browser and use New to create a blank workflow."
+              />
             </DialogContent>
           </Dialog>
 

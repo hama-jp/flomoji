@@ -486,6 +486,27 @@ const ReactFlowEditor = ({ selectedNode, editingNode, onSelectedNodeChange, onEd
     setWorkflows(Object.values(workflowsData));
   }, [currentWorkflow]);
 
+  const handleCreateStarterWorkflow = useCallback((templateId: string) => {
+    const template = starterWorkflowTemplates.find(entry => entry.id === templateId);
+    if (!template) {
+      toast.error('スターターテンプレートが見つかりませんでした');
+      return;
+    }
+
+    const createdWorkflow = workflowManagerService.createWorkflowFromTemplate(template.workflow);
+    workflowManagerService.saveWorkflow(createdWorkflow);
+    workflowManagerService.setCurrentWorkflowId(createdWorkflow.id);
+
+    loadWorkflow(createdWorkflow.id);
+    setCurrentWorkflow(createdWorkflow);
+    setHasUnsavedChanges(false);
+    setStarterPanelDismissed(false);
+
+    const workflowsData = workflowManagerService.getWorkflows();
+    setWorkflows(Object.values(workflowsData));
+    toast.success(`"${template.name}" を新しいワークフローとして作成しました`);
+  }, [loadWorkflow]);
+
   const handleApplyStarterTemplate = useCallback((templateId: string) => {
     const template = starterWorkflowTemplates.find(entry => entry.id === templateId);
     if (!template) {
@@ -819,6 +840,7 @@ const ReactFlowEditor = ({ selectedNode, editingNode, onSelectedNodeChange, onEd
         onStop={handleResetExecution}
         isExecuting={executionState?.running}
         onOpenCopilot={onOpenCopilot}
+        onCreateFromTemplate={handleCreateStarterWorkflow}
       />
       <HandleLabelsProvider showHandleLabels={showHandleLabels}>
         <ReactFlow
