@@ -7,6 +7,19 @@ import { Textarea } from '@/components/ui/textarea';
 
 import CustomNode from './CustomNode';
 
+const DOWNLOAD_CONFIG = {
+  text: { extension: 'txt', mimeType: 'text/plain;charset=utf-8', label: 'Text' },
+  json: { extension: 'json', mimeType: 'application/json;charset=utf-8', label: 'JSON' },
+  markdown: { extension: 'md', mimeType: 'text/markdown;charset=utf-8', label: 'Markdown' }
+} as const;
+
+const sanitizeFileName = (value: string) =>
+  value
+    .trim()
+    .replace(/[<>:"/\\|?*\x00-\x1F]/g, '-')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
 
 const OutputNodeComponent = ({ id, data }: any) => {
   
@@ -18,15 +31,18 @@ const OutputNodeComponent = ({ id, data }: any) => {
     if (!displayResult || displayResult === 'No result yet...') {
       return;
     }
-    
+
+    const format = data.format || 'text';
+    const config = DOWNLOAD_CONFIG[format as keyof typeof DOWNLOAD_CONFIG] || DOWNLOAD_CONFIG.text;
+
     // Blobを作成してダウンロード
-    const blob = new Blob([displayResult], { type: 'text/plain;charset=utf-8' });
+    const blob = new Blob([displayResult], { type: config.mimeType });
     const url = URL.createObjectURL(blob);
-    
-    // 現在の日時をファイル名に使用
+
     const now = new Date();
     const timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, -5);
-    const filename = `output_${timestamp}.txt`;
+    const preferredName = sanitizeFileName(data.fileName || data.title || data.label || 'output');
+    const filename = `${preferredName || 'output'}_${timestamp}.${config.extension}`;
     
     // ダウンロードリンクを作成
     const link = document.createElement('a');
@@ -67,7 +83,7 @@ const OutputNodeComponent = ({ id, data }: any) => {
           className="w-full"
         >
           <Download className="w-4 h-4" />
-          Download as Text
+          Download as {(DOWNLOAD_CONFIG[data.format as keyof typeof DOWNLOAD_CONFIG] || DOWNLOAD_CONFIG.text).label}
         </Button>
       </div>
     </CustomNode>

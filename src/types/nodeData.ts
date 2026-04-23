@@ -83,8 +83,9 @@ export interface InputNodeData {
 
 // OutputNode用の型定義
 export interface OutputNodeData {
-  format?: 'text' | 'json';
+  format?: 'text' | 'json' | 'markdown';
   title?: string;
+  fileName?: string;
   result?: string;
 }
 
