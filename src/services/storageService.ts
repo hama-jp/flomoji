@@ -5,7 +5,7 @@
  * 新しい開発者が参加しやすくするため、ストレージキーの管理を統一化しています。
  */
 
-import { StorageData, Workflow, LLMSettings } from '../types';
+import { StorageData, Workflow, LLMSettings, ScheduleConfig } from '../types';
 
 // Storage usage info interface
 interface StorageUsageInfo {
@@ -31,7 +31,8 @@ class StorageService {
     WORKFLOWS: 'llm-agent-workflows', 
     CURRENT_WORKFLOW_ID: 'llm-agent-current-workflow-id',
     CHAT_HISTORY: 'llm-agent-chat-history',
-    WORKFLOW_HISTORY: 'llm-agent-workflow-history'
+    WORKFLOW_HISTORY: 'llm-agent-workflow-history',
+    SCHEDULER_WORKFLOWS: 'scheduler-workflows'
   } as const;
 
   /**
@@ -176,6 +177,24 @@ class StorageService {
    */
   static setWorkflows(workflows: Record<string, Workflow>): boolean {
     return this.set(this.KEYS.WORKFLOWS, workflows);
+  }
+
+  /**
+   * スケジュール設定を取得
+   * @param defaultSchedules - デフォルトのスケジュール設定
+   * @returns スケジュール設定
+   */
+  static getSchedulerWorkflows(defaultSchedules: Record<string, ScheduleConfig> = {}): Record<string, ScheduleConfig> {
+    return this.get<Record<string, ScheduleConfig>>(this.KEYS.SCHEDULER_WORKFLOWS, defaultSchedules) || defaultSchedules;
+  }
+
+  /**
+   * スケジュール設定を保存
+   * @param schedules - スケジュール設定
+   * @returns 保存成功の可否
+   */
+  static setSchedulerWorkflows(schedules: Record<string, ScheduleConfig>): boolean {
+    return this.set(this.KEYS.SCHEDULER_WORKFLOWS, schedules);
   }
 
   /**

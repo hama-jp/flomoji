@@ -153,4 +153,28 @@ describe('schedulerService', () => {
     expect(SchedulerService.humanReadableCron('0 9 * * *')).toBe('毎日 9:00'); // 修正
     expect(SchedulerService.humanReadableCron('0 9 * * 1')).toBe('毎週月曜日 9:00'); // 修正
   });
+
+  it('should clear all schedules', () => {
+    schedulerService.setSchedule('workflow-1', {
+      workflowId: 'workflow-1',
+      cronExpression: '0 9 * * *',
+      name: 'Digest 1',
+      enabled: true,
+      onExecute: vi.fn()
+    });
+
+    schedulerService.setSchedule('workflow-2', {
+      workflowId: 'workflow-2',
+      cronExpression: '0 10 * * *',
+      name: 'Digest 2',
+      enabled: false,
+      onExecute: vi.fn()
+    });
+
+    expect(schedulerService.getAllSchedules()).toHaveLength(2);
+
+    schedulerService.clearSchedules();
+
+    expect(schedulerService.getAllSchedules()).toHaveLength(0);
+  });
 });
