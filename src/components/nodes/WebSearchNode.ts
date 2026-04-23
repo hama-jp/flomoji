@@ -7,6 +7,64 @@ import type { WebSearchNodeData } from '../../types/nodeData';
 const searchCache = new Map();
 const CACHE_TTL = 60 * 60 * 1000; // 1時間
 
+const DOMAIN_SEPARATOR = /[\n,]+/;
+
+function sanitizeSiteFilter(value: string): string {
+  return value
+    .trim()
+    .replace(/^https?:\/\//i, '')
+    .replace(/^www\./i, '')
+    .replace(/\/.*$/, '');
+}
+
+export function normalizeSiteFilters(siteFilters?: string | string[]): string[] {
+  if (!siteFilters) {
+    return [];
+  }
+
+  const rawValues = Array.isArray(siteFilters)
+    ? siteFilters
+    : siteFilters.split(DOMAIN_SEPARATOR);
+
+  return rawValues
+    .map(sanitizeSiteFilter)
+    .filter(Boolean);
+}
+
+export function buildSearchQuery(query: string, siteFilters?: string | string[]): string {
+  const baseQuery = query.trim();
+  const normalizedSites = normalizeSiteFilters(siteFilters);
+
+  if (normalizedSites.length === 0) {
+    return baseQuery;
+  }
+
+  const siteClause = normalizedSites.map((site) => `site:${site}`).join(' OR ');
+  return `${baseQuery} (${siteClause})`;
+}
+
+export function mapFreshnessForProvider(provider: string, freshnessDays?: number): Record<string, string> {
+  if (!freshnessDays || freshnessDays < 1) {
+    return {};
+  }
+
+  switch (provider) {
+    case 'google':
+      return { dateRestrict: `d${freshnessDays}` };
+    case 'brave':
+      if (freshnessDays <= 1) return { freshness: 'pd' };
+      if (freshnessDays <= 7) return { freshness: 'pw' };
+      if (freshnessDays <= 31) return { freshness: 'pm' };
+      return { freshness: 'py' };
+    case 'bing':
+      if (freshnessDays <= 1) return { freshness: 'Day' };
+      if (freshnessDays <= 7) return { freshness: 'Week' };
+      return { freshness: 'Month' };
+    default:
+      return {};
+  }
+}
+
 // Web検索ノードの実行ロジック
 export async function executeWebSearchNode(node: WorkflowNode, inputs: NodeInputs): Promise<NodeOutput> {
   const data = node.data as WebSearchNodeData;
@@ -16,10 +74,13 @@ export async function executeWebSearchNode(node: WorkflowNode, inputs: NodeInput
     maxResults = 10,
     safeSearch = true,
     language = 'ja',
-    cacheEnabled = true
+    cacheEnabled = true,
+    siteFilters,
+    freshnessDays
   } = data;
   
-  const query = inputs.query || data.query;
+  const rawQuery = inputs.query ?? data.query ?? '';
+  const query = typeof rawQuery === 'string' ? rawQuery : String(rawQuery);
   
   if (!query || !query.trim()) {
     throw new Error('検索クエリが指定されていません');
@@ -31,13 +92,16 @@ export async function executeWebSearchNode(node: WorkflowNode, inputs: NodeInput
   if (!finalApiKey) {
     throw new Error(`${provider}のAPIキーが設定されていません。設定画面でAPIキーを入力してください。`);
   }
+
+  const normalizedSites = normalizeSiteFilters(siteFilters);
+  const effectiveQuery = buildSearchQuery(query, normalizedSites);
   
   // キャッシュチェック
-  const cacheKey = `${provider}:${query}:${maxResults}:${language}`;
+  const cacheKey = `${provider}:${effectiveQuery}:${maxResults}:${language}:${freshnessDays || 'all'}`;
   if (cacheEnabled && searchCache.has(cacheKey)) {
     const cached = searchCache.get(cacheKey);
     if (Date.now() - cached.timestamp < CACHE_TTL) {
-      console.log('Using cached search results for:', query);
+      console.log('Using cached search results for:', effectiveQuery);
       return cached.data;
     }
     searchCache.delete(cacheKey);
@@ -48,13 +112,13 @@ export async function executeWebSearchNode(node: WorkflowNode, inputs: NodeInput
     
     switch (provider) {
       case 'google':
-        results = await searchGoogle(query, finalApiKey, maxResults, language, safeSearch);
+        results = await searchGoogle(effectiveQuery, finalApiKey, maxResults, language, safeSearch, freshnessDays);
         break;
       case 'brave':
-        results = await searchBrave(query, finalApiKey, maxResults, language, safeSearch);
+        results = await searchBrave(effectiveQuery, finalApiKey, maxResults, language, safeSearch, freshnessDays);
         break;
       case 'bing':
-        results = await searchBing(query, finalApiKey, maxResults, language, safeSearch);
+        results = await searchBing(effectiveQuery, finalApiKey, maxResults, language, safeSearch, freshnessDays);
         break;
       default:
         throw new Error(`未対応の検索プロバイダー: ${provider}`);
@@ -68,9 +132,12 @@ export async function executeWebSearchNode(node: WorkflowNode, inputs: NodeInput
       results: normalizedResults.results,
       metadata: {
         query,
+        effectiveQuery,
         provider,
         totalResults: normalizedResults.totalResults,
         searchTime: normalizedResults.searchTime || 0,
+        siteFilters: normalizedSites,
+        freshnessDays: freshnessDays || null,
         cached: false
       },
       error: null
@@ -92,7 +159,10 @@ export async function executeWebSearchNode(node: WorkflowNode, inputs: NodeInput
       results: [],
       metadata: {
         query,
+        effectiveQuery,
         provider,
+        siteFilters: normalizedSites,
+        freshnessDays: freshnessDays || null,
         error: true
       },
       error: error instanceof Error ? error.message : String(error)
@@ -101,7 +171,7 @@ export async function executeWebSearchNode(node: WorkflowNode, inputs: NodeInput
 }
 
 // Google Custom Search API
-async function searchGoogle(query: string, apiKey: string, maxResults: number, language: string, safeSearch: boolean): Promise<any> {
+async function searchGoogle(query: string, apiKey: string, maxResults: number, language: string, safeSearch: boolean, freshnessDays?: number): Promise<any> {
   const searchEngineId = getSearchEngineId('google');
   if (!searchEngineId) {
     throw new Error('Google検索エンジンIDが設定されていません');
@@ -115,6 +185,11 @@ async function searchGoogle(query: string, apiKey: string, maxResults: number, l
     hl: language,
     safe: safeSearch ? 'active' : 'off'
   });
+
+  const freshnessOptions = mapFreshnessForProvider('google', freshnessDays);
+  if (freshnessOptions.dateRestrict) {
+    params.set('dateRestrict', freshnessOptions.dateRestrict);
+  }
   
   const response = await fetch(`https://www.googleapis.com/customsearch/v1?${params}`);
   
@@ -127,13 +202,18 @@ async function searchGoogle(query: string, apiKey: string, maxResults: number, l
 }
 
 // Brave Search API
-async function searchBrave(query: string, apiKey: string, maxResults: number, language: string, safeSearch: boolean): Promise<any> {
+async function searchBrave(query: string, apiKey: string, maxResults: number, language: string, safeSearch: boolean, freshnessDays?: number): Promise<any> {
   const params = new URLSearchParams({
     q: query,
     count: Math.min(maxResults, 20).toString(), // Brave APIは最大20件
     search_lang: language,
     safesearch: safeSearch ? 'strict' : 'off'
   });
+
+  const freshnessOptions = mapFreshnessForProvider('brave', freshnessDays);
+  if (freshnessOptions.freshness) {
+    params.set('freshness', freshnessOptions.freshness);
+  }
   
   const response = await fetch(`https://api.search.brave.com/res/v1/web/search?${params}`, {
     headers: {
@@ -151,13 +231,18 @@ async function searchBrave(query: string, apiKey: string, maxResults: number, la
 }
 
 // Bing Search API
-async function searchBing(query: string, apiKey: string, maxResults: number, language: string, safeSearch: boolean): Promise<any> {
+async function searchBing(query: string, apiKey: string, maxResults: number, language: string, safeSearch: boolean, freshnessDays?: number): Promise<any> {
   const params = new URLSearchParams({
     q: query,
     count: Math.min(maxResults, 50).toString(), // Bing APIは最大50件
     mkt: language === 'ja' ? 'ja-JP' : 'en-US',
     safeSearch: safeSearch ? 'Strict' : 'Off'
   });
+
+  const freshnessOptions = mapFreshnessForProvider('bing', freshnessDays);
+  if (freshnessOptions.freshness) {
+    params.set('freshness', freshnessOptions.freshness);
+  }
   
   const response = await fetch(`https://api.bing.microsoft.com/v7.0/search?${params}`, {
     headers: {
@@ -254,11 +339,13 @@ export const WebSearchNode = createNodeDefinition(
     maxResults: 10,
     safeSearch: true,
     language: 'ja',
-    cacheEnabled: true
+    cacheEnabled: true,
+    siteFilters: '',
+    freshnessDays: 3
   },
   executeWebSearchNode,
   {
-    description: 'Search the web using Google, Brave, or Bing APIs. Returns normalized results.',
+    description: 'Search the web using Google, Brave, or Bing APIs with optional site filters and recency windows. Returns normalized results.',
     category: 'web-integration',
     outputMapping: {
       results: 'results',

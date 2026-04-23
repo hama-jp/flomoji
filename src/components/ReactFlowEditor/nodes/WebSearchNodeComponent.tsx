@@ -86,7 +86,7 @@ const WebSearchNodeComponent = memo(({ data = {}, id }: WebSearchNodeComponentPr
         <div className="space-y-2">
           <Label className="text-xs text-gray-600">検索クエリ</Label>
           <Textarea
-            placeholder="検索したい内容を入力..."
+            placeholder="例: 生成AI 業界動向 OR LLM regulation"
             value={data.query || ''}
             onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => updateData('query', e.target.value)}
             className="text-sm min-h-[60px] nodrag"
@@ -143,6 +143,36 @@ const WebSearchNodeComponent = memo(({ data = {}, id }: WebSearchNodeComponentPr
                 </SelectContent>
               </Select>
             </div>
+            <div className="space-y-2">
+              <Label className="text-xs text-gray-600">対象サイト</Label>
+              <Textarea
+                placeholder={'techcrunch.com\nopenai.com\nwww.theverge.com'}
+                value={data.siteFilters || ''}
+                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => updateData('siteFilters', e.target.value)}
+                className="text-xs min-h-[72px] nodrag"
+              />
+              <div className="text-[11px] text-muted-foreground">
+                1行またはカンマ区切りで指定すると `site:` 条件として検索に追加されます。
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs text-gray-600 flex items-center gap-1">
+                <Clock className="w-3 h-3" />
+                過去何日を対象にするか
+              </Label>
+              <Input
+                type="number"
+                min="1"
+                max="365"
+                value={data.freshnessDays ?? ''}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                  const rawValue = e.target.value.trim();
+                  updateData('freshnessDays', rawValue ? Math.max(1, parseInt(rawValue, 10) || 1) : undefined);
+                }}
+                className="text-xs h-8 nodrag"
+                placeholder="例: 3"
+              />
+            </div>
             <div className="flex items-center justify-between">
               <Label htmlFor="safeSearch" className="text-xs flex items-center gap-1">
                 <Shield className="w-3 h-3" />
@@ -183,6 +213,16 @@ const WebSearchNodeComponent = memo(({ data = {}, id }: WebSearchNodeComponentPr
               <Badge variant="outline" className="text-xs">
                 <Clock className="w-3 h-3 mr-1" />
                 Cache
+              </Badge>
+            )}
+            {!!data.siteFilters?.trim() && (
+              <Badge variant="outline" className="text-xs">
+                Sites
+              </Badge>
+            )}
+            {!!data.freshnessDays && (
+              <Badge variant="outline" className="text-xs">
+                {data.freshnessDays}d
               </Badge>
             )}
           </div>

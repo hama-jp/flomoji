@@ -24,6 +24,8 @@ export interface WebSearchNodeData {
   safeSearch?: boolean;
   language?: string;
   cacheEnabled?: boolean;
+  siteFilters?: string;
+  freshnessDays?: number;
 }
 
 // WebAPINode用の型定義
@@ -57,6 +59,7 @@ export interface LLMNodeData {
   provider?: string;
   systemPrompt?: string | null;
   maxTokens?: number | null;
+  prompt?: string;
 }
 
 // TimestampNode用の型定義
@@ -101,6 +104,8 @@ export interface ScheduleNodeData {
   cronExpression?: string;
   scheduleName?: string;
   enabled?: boolean;
+  timezone?: string;
+  timeoutMinutes?: number;
 }
 
 // TextCombinerNode用の型定義
