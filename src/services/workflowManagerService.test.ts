@@ -198,4 +198,34 @@ describe('workflowManagerService', () => {
     expect(updatedWorkflow?.flow.nodes.length).toBeGreaterThan(0);
     expect(workflowManagerService.getCurrentWorkflowId()).toBe(blankWorkflow.id);
   });
+
+  it('should create a new workflow from a starter template without mutating the template', () => {
+    const savedWorkflows: Record<string, Workflow> = {};
+
+    vi.spyOn(StorageService, 'getWorkflows').mockImplementation(() => savedWorkflows);
+    vi.spyOn(StorageService, 'setWorkflows').mockImplementation((workflows) => {
+      Object.assign(savedWorkflows, workflows);
+      return true;
+    });
+
+    const template = starterWorkflowTemplates[2];
+    const createdWorkflow = workflowManagerService.createWorkflowFromTemplate(
+      template.workflow,
+      'Template Copy'
+    );
+
+    workflowManagerService.saveWorkflow(createdWorkflow);
+
+    expect(createdWorkflow.id).toBeDefined();
+    expect(createdWorkflow.name).toBe('Template Copy');
+    expect(createdWorkflow.flow).not.toBe(template.workflow.flow);
+    expect(createdWorkflow.flow.nodes).toEqual(template.workflow.flow.nodes);
+
+    const createdInputNode = createdWorkflow.flow.nodes[0] as { data: { label: string } };
+    const templateInputNode = template.workflow.flow.nodes[0] as { data: { label: string } };
+
+    createdInputNode.data.label = 'Changed';
+
+    expect(templateInputNode.data.label).toBe('Input');
+  });
 });
