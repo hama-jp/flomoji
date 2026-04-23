@@ -14,7 +14,9 @@ import workflowManagerService from '../../services/workflowManagerService';
 import { useStore as useUIStore } from '../../store';
 import useExecutionStore, { ExecutionStore } from '../../store/executionStore';
 import useReactFlowStore from '../../store/reactFlowStore';
+import { starterWorkflowTemplates } from '../../data/starterWorkflowTemplates';
 import ExecutionOutputWindow from '../ExecutionOutputWindow';
+import StarterWorkflowPanel from '../StarterWorkflowPanel';
 import { nodeTypes as nodeDefinitions } from '../nodes';
 import WorkflowToolbar from '../WorkflowToolbar';
 
@@ -97,7 +99,7 @@ const edgeTypes = {
   custom: CustomEdge,
 };
 
-const ReactFlowEditor = ({ selectedNode, onSelectedNodeChange, onEditingNodeChange, onOpenCopilot }: any) => {
+const ReactFlowEditor = ({ selectedNode, editingNode, onSelectedNodeChange, onEditingNodeChange, onOpenCopilot }: any) => {
   // 個別のセレクターを使用してZustandストアから値を取得
   const rawNodes = useReactFlowStore(selectNodes);
   const rawEdges = useReactFlowStore(selectEdges);
@@ -150,6 +152,7 @@ const ReactFlowEditor = ({ selectedNode, onSelectedNodeChange, onEditingNodeChan
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showHandleLabels, setShowHandleLabels] = useState(true);
+  const [starterPanelDismissed, setStarterPanelDismissed] = useState(false);
 
   // useRefで安定した参照を作成（Phase 3最適化）
   const nodesRef = useRef(nodes);
@@ -173,6 +176,10 @@ const ReactFlowEditor = ({ selectedNode, onSelectedNodeChange, onEditingNodeChan
   useEffect(() => {
     viewportRef.current = viewport;
   }, [viewport]);
+
+  useEffect(() => {
+    setStarterPanelDismissed(false);
+  }, [currentWorkflow?.id]);
 
   // Initial load effect
   useEffect(() => {
@@ -479,6 +486,38 @@ const ReactFlowEditor = ({ selectedNode, onSelectedNodeChange, onEditingNodeChan
     setWorkflows(Object.values(workflowsData));
   }, [currentWorkflow]);
 
+  const handleApplyStarterTemplate = useCallback((templateId: string) => {
+    const template = starterWorkflowTemplates.find(entry => entry.id === templateId);
+    if (!template) {
+      toast.error('スターターテンプレートが見つかりませんでした');
+      return;
+    }
+
+    if (!currentWorkflow) {
+      toast.error('現在のワークフローを読み込めませんでした');
+      return;
+    }
+
+    const appliedWorkflow = workflowManagerService.applyTemplateToWorkflow(
+      currentWorkflow.id,
+      template.workflow
+    );
+
+    if (!appliedWorkflow) {
+      toast.error('テンプレートの適用に失敗しました');
+      return;
+    }
+
+    loadWorkflow(appliedWorkflow.id);
+    setCurrentWorkflow(appliedWorkflow);
+    setHasUnsavedChanges(false);
+    setStarterPanelDismissed(false);
+
+    const workflowsData = workflowManagerService.getWorkflows();
+    setWorkflows(Object.values(workflowsData));
+    toast.success(`"${template.name}" を読み込みました`);
+  }, [currentWorkflow, loadWorkflow]);
+
   // プロパティ変更をReactFlowストアに反映する関数は不要になったため削除
 
   const { handleRunAll, handleStepForward, handleResetExecution }: any = useWorkflowExecution({
@@ -750,6 +789,15 @@ const ReactFlowEditor = ({ selectedNode, onSelectedNodeChange, onEditingNodeChan
   // }, [setViewport]);
 
   // デバッグログを削除（不要な出力を減らす）
+  const isCurrentWorkflowEmpty =
+    !!currentWorkflow &&
+    nodes.length === 0 &&
+    edges.length === 0;
+
+  const showStarterWorkflowPanel =
+    isCurrentWorkflowEmpty &&
+    !starterPanelDismissed &&
+    !editingNode;
   
   return (
     <div style={{ width: '100%', height: '100%' }}>
@@ -836,6 +884,13 @@ Show Handle Labels
         </div>
         </ReactFlow>
       </HandleLabelsProvider>
+      {showStarterWorkflowPanel && (
+        <StarterWorkflowPanel
+          templates={starterWorkflowTemplates}
+          onApplyTemplate={handleApplyStarterTemplate}
+          onDismiss={() => setStarterPanelDismissed(true)}
+        />
+      )}
       <ContextMenu />
       
       {/* 実行結果ウィンドウ */}
