@@ -63,7 +63,7 @@ class LLMService {
       provider: 'openai',
       apiKey: '',
       baseUrl: '',
-      model: 'gpt-3.5-turbo',
+      model: 'gpt-5-nano',
       temperature: 0.7,
       maxTokens: 2048
     }) as ExtendedLLMSettings;
@@ -73,7 +73,7 @@ class LLMService {
         provider: 'openai',
         apiKey: '',
         baseUrl: '',
-        model: 'gpt-3.5-turbo',
+        model: 'gpt-5-nano',
         temperature: 0.7,
         maxTokens: 2048
       };

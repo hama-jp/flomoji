@@ -48,7 +48,7 @@ export const API_TEMPLATES: Record<string, (query: string, apiKey?: string) => A
       'Authorization': `Bearer ${apiKey || '{API_KEY}'}`
     },
     body: {
-      model: 'gpt-3.5-turbo',
+      model: 'gpt-5-nano',
       messages: [{ role: 'user', content: query }],
       temperature: 0.7
     },

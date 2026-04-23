@@ -3,7 +3,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 import * as llmService from './llmService';
+import logService from './logService';
 import nodeExecutionService from './nodeExecutionService';
+import StorageService from './storageService';
 
 // Mock localStorage
 const localStorageMock = (() => {
@@ -188,6 +190,23 @@ describe('nodeExecutionService', () => {
       
       // Clean up
       nodeExecutionService.stopExecution();
+    });
+
+    it('should use the persisted current workflow ID for execution logs', async () => {
+      const createRunSpy = vi.spyOn(logService, 'createRun').mockResolvedValue('run-1');
+      StorageService.setCurrentWorkflowId('workflow-123');
+
+      const nodes: any[] = [
+        {
+          id: 'input-1',
+          type: 'input',
+          data: { value: 'test' }
+        }
+      ];
+
+      await nodeExecutionService.startExecution(nodes, [], {});
+
+      expect(createRunSpy).toHaveBeenCalledWith('workflow-123', {});
     });
 
     it('should handle circular dependencies', async () => {
